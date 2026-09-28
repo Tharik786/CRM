@@ -91,23 +91,3 @@ export function exportToCSV<T extends object>(
   document.body.removeChild(link);
 }
 
-export function parseCSV(csvText: string): Record<string, string>[] {
-  const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
-  if (lines.length < 2) return [];
-
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-  const results: Record<string, string>[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const currentLine = lines[i].split(',').map(item => item.trim().replace(/^"|"$/g, ''));
-    if (currentLine.length === headers.length) {
-      const row: Record<string, string> = {};
-      headers.forEach((header, index) => {
-        row[header] = currentLine[index];
-      });
-      results.push(row);
-    }
-  }
-
-  return results;
-}

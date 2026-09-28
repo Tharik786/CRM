@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -46,37 +47,41 @@ export const Modal: React.FC<ModalProps> = ({
     '4xl': 'max-w-4xl',
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity animate-fade-in"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Modal Wrapper */}
-      <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+      <div className="flex min-h-full items-center justify-center p-3 sm:p-4 text-center">
         <div
-          className={`relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full my-8 border border-slate-100 animate-fade-in ${maxWidthStyles[maxWidth]}`}
+          className={`relative z-10 rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-h-[90vh] flex flex-col my-auto border border-slate-200/90 animate-fade-in ${maxWidthStyles[maxWidth]}`}
         >
           {/* Header */}
-          <div className="flex items-start justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70 shrink-0 rounded-t-2xl">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-              {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">{title}</h3>
+              {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
             </div>
             <button
               onClick={onClose}
+              type="button"
               className="text-slate-400 hover:text-slate-600 rounded-lg p-1.5 hover:bg-slate-200/60 transition-colors"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Body */}
-          <div className="p-6 max-h-[75vh] overflow-y-auto">{children}</div>
+          <div className="p-5 sm:p-6 overflow-y-auto flex-1">{children}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

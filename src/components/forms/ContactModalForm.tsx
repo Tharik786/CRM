@@ -3,6 +3,7 @@ import { Contact } from '../../types/crm';
 import { Modal } from '../common/Modal';
 import { Input, Select } from '../common/Input';
 import { Button } from '../common/Button';
+import { useAuth } from '../../context/AuthContext';
 
 interface ContactModalFormProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
   onSubmit,
   initialData,
 }) => {
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -74,7 +76,7 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
         email,
         phone,
         lifecycleStage,
-        assignedTo: initialData?.assignedTo || 'usr_01',
+        assignedTo: initialData?.assignedTo || user?.id || 'usr_current',
         notes,
       });
       onClose();
@@ -87,7 +89,7 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialData ? 'Edit Contact Person' : 'Add New Contact'}
+      title={initialData ? 'Edit Client' : 'Add New Client'}
       subtitle="Record individual relationships, roles, and communication history"
       maxWidth="md"
     >
@@ -165,7 +167,7 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
             Cancel
           </Button>
           <Button type="submit" variant="primary" size="sm" isLoading={isSubmitting}>
-            {initialData ? 'Update Contact' : 'Save Contact'}
+            {initialData ? 'Update Client' : 'Save Client'}
           </Button>
         </div>
       </form>

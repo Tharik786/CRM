@@ -3,6 +3,7 @@ import { Lead, LeadSource, LeadStatus } from '../../types/crm';
 import { Modal } from '../common/Modal';
 import { Input, Select } from '../common/Input';
 import { Button } from '../common/Button';
+import { useAuth } from '../../context/AuthContext';
 
 interface LeadModalFormProps {
   isOpen: boolean;
@@ -17,14 +18,15 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
   onSubmit,
   initialData,
 }) => {
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [source, setSource] = useState<LeadSource>('website');
   const [status, setStatus] = useState<LeadStatus>('new');
-  const [score, setScore] = useState(70);
-  const [estimatedValue, setEstimatedValue] = useState(35000);
+  const [score, setScore] = useState(50);
+  const [estimatedValue, setEstimatedValue] = useState(0);
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,8 +49,8 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
       setPhone('');
       setSource('website');
       setStatus('new');
-      setScore(75);
-      setEstimatedValue(35000);
+      setScore(50);
+      setEstimatedValue(0);
       setNotes('');
     }
     setErrors({});
@@ -83,7 +85,7 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
         status,
         score: Number(score),
         estimatedValue: Number(estimatedValue),
-        assignedTo: initialData?.assignedTo || 'usr_01',
+        assignedTo: initialData?.assignedTo || user?.id || 'usr_current',
         notes,
       });
       onClose();
@@ -96,7 +98,7 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialData ? 'Edit Sales Lead' : 'Create New Lead'}
+      title={initialData ? 'Edit Enquiry' : 'Create New Enquiry'}
       subtitle="Capture customer enquiry and set pipeline score"
       maxWidth="lg"
     >
@@ -192,7 +194,7 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">Lead Notes / Requirements</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5">Enquiry Notes / Requirements</label>
           <textarea
             rows={3}
             value={notes}
@@ -207,7 +209,7 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
             Cancel
           </Button>
           <Button type="submit" variant="primary" size="sm" isLoading={isSubmitting}>
-            {initialData ? 'Update Lead' : 'Save Lead'}
+            {initialData ? 'Update Enquiry' : 'Save Enquiry'}
           </Button>
         </div>
       </form>

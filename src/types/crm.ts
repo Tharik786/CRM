@@ -61,12 +61,12 @@ export interface Contact {
   createdAt: string;
 }
 
-export type DealStage = 
-  | 'qualification' 
-  | 'needs_analysis' 
-  | 'proposal_sent' 
-  | 'negotiation' 
-  | 'closed_won' 
+export type DealStage =
+  | 'qualification'
+  | 'needs_analysis'
+  | 'proposal_sent'
+  | 'negotiation'
+  | 'closed_won'
   | 'closed_lost';
 
 export interface Deal {
@@ -185,3 +185,52 @@ export interface DashboardMetrics {
   recentActivities: Activity[];
   upcomingTasks: Task[];
 }
+
+export type InstallationStatus = 'scheduled' | 'in_progress' | 'completed' | 'pending' | 'cancelled';
+
+export interface Installation {
+  id: string;
+  customerId?: string; // Client Contact ID
+  customerName: string;
+  dealId?: string;     // Sales Pipeline Deal ID
+  dealTitle?: string;
+  bookingDate: string; // YYYY-MM-DD
+  installationDate: string; // YYYY-MM-DD
+  installer: string;
+  status: InstallationStatus;
+  siteAddress?: string;
+  contactPhone?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ScheduleStatus = 'confirmed' | 'on_route' | 'in_progress' | 'completed' | 'rescheduled';
+
+export interface InstallerScheduleItem {
+  id: string;
+  installer: string;
+  siteVisitTime: string; // e.g. "09:00 AM - 11:30 AM"
+  visitDate: string;     // YYYY-MM-DD
+  customerId?: string;
+  customerName: string;
+  installationId?: string;
+  status: ScheduleStatus;
+  siteAddress?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeviceInventoryItem {
+  id: string;
+  deviceName: string;
+  category: string;
+  requiredQty: number;
+  availableQty: number;
+  allocatedQty: number;
+  unit: string;
+  sku?: string;
+  updatedAt: string;
+}
+

@@ -3,7 +3,6 @@ import { useCrm } from '../../context/CrmContext';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardHeader, CardBody } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
-import { Button } from '../../components/common/Button';
 import { LoadingSpinner } from '../../components/common/EmptyState';
 import { formatCurrency, formatRelativeTime } from '../../utils/formatters';
 import {
@@ -14,20 +13,16 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Clock,
-  Briefcase,
   Activity as ActivityIcon,
-  ChevronRight,
   Flame,
   PhoneCall,
   Mail,
   Users2,
-  Sparkles,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { DashboardMetrics } from '../../types/crm';
 import { crmService } from '../../api/services/crmService';
 
-export const TodayDashboardPage: React.FC = () => {
+export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { tasks, toggleTask } = useCrm();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -47,44 +42,44 @@ export const TodayDashboardPage: React.FC = () => {
     fetchMetrics();
   }, []);
 
-  if (loading || !metrics) {
-    return <LoadingSpinner label="Crunching daily revenue intelligence..." />;
+  if (loading) {
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <LoadingSpinner label="Calculating real-time CRM metrics..." />
+      </div>
+    );
   }
 
-  const todayTasks = tasks.filter(t => t.dueDate === '2026-09-26' || t.status === 'pending').slice(0, 5);
+  if (!metrics) {
+    return null;
+  }
+
+  const todayTasks = tasks.slice(0, 5);
+  const activeDealsCount = metrics.stageBreakdown
+    .filter(s => s.stage !== 'closed_won' && s.stage !== 'closed_lost')
+    .reduce((acc, curr) => acc + curr.count, 0);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+      return 'Good morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good afternoon';
+    } else {
+      return 'Good evening';
+    }
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-brand-950 text-white p-6 sm:p-8 shadow-elevated border border-slate-800">
-        <div className="absolute right-0 top-0 bottom-0 w-96 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-500/20 via-indigo-500/10 to-transparent pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/20 text-brand-300 border border-brand-500/30">
-                <Sparkles className="w-3.5 h-3.5 text-brand-400" />
-                Live Revenue Operations
-              </span>
-              <span className="text-xs text-slate-400 font-mono">
-                Saturday, September 26, 2026
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Good morning, {user?.name?.split(' ')[0] || 'Alex'} 👋
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-xl">
-              You have <span className="text-brand-300 font-semibold">{todayTasks.filter(t => t.status !== 'completed').length} priority follow-ups</span> scheduled for today and <span className="text-emerald-400 font-semibold">{formatCurrency(metrics.pipelineValue)}</span> in active deal pipeline.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 shrink-0">
-            <Link to="/deals">
-              <Button variant="primary" size="sm" icon={<Briefcase className="w-4 h-4" />}>
-                View Pipeline Kanban
-              </Button>
-            </Link>
-          </div>
-        </div>
+    <div className="space-y-5 animate-fade-in pb-12">
+      {/* Welcome Greeting Header */}
+      <div>
+        <span className="text-xs sm:text-sm font-medium text-slate-500 tracking-normal block">
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-1">
+          {getGreeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
+        </h1>
       </div>
 
       {/* KPI Stats Grid */}
@@ -94,7 +89,7 @@ export const TodayDashboardPage: React.FC = () => {
           <CardBody className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Closed Revenue
+                Revenue
               </span>
               <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <DollarSign className="w-5 h-5" />
@@ -106,9 +101,8 @@ export const TodayDashboardPage: React.FC = () => {
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs">
                 <span className="inline-flex items-center text-emerald-600 font-semibold">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> +{metrics.revenueChange}%
+                  <ArrowUpRight className="w-3.5 h-3.5" /> {metrics.dealsWonCount} deals won
                 </span>
-                <span className="text-slate-400">vs last month</span>
               </div>
             </div>
           </CardBody>
@@ -119,7 +113,7 @@ export const TodayDashboardPage: React.FC = () => {
           <CardBody className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Active Pipeline
+                Pipeline Value
               </span>
               <div className="h-9 w-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
                 <TrendingUp className="w-5 h-5" />
@@ -131,7 +125,7 @@ export const TodayDashboardPage: React.FC = () => {
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs">
                 <span className="inline-flex items-center text-brand-600 font-semibold">
-                  <Flame className="w-3.5 h-3.5 text-amber-500 mr-0.5" /> 5 deals
+                  <Flame className="w-3.5 h-3.5 text-amber-500 mr-0.5" /> {activeDealsCount} {activeDealsCount === 1 ? 'deal' : 'deals'}
                 </span>
                 <span className="text-slate-400">in progression</span>
               </div>
@@ -144,7 +138,7 @@ export const TodayDashboardPage: React.FC = () => {
           <CardBody className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Opportunity Win Rate
+                Win Rate
               </span>
               <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                 <Award className="w-5 h-5" />
@@ -164,12 +158,12 @@ export const TodayDashboardPage: React.FC = () => {
           </CardBody>
         </Card>
 
-        {/* Active Enquiries */}
+        {/* New Enquiries */}
         <Card className="hover:border-brand-200">
           <CardBody className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Active Sales Leads
+                New Enquiries
               </span>
               <div className="h-9 w-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                 <Target className="w-5 h-5" />
@@ -177,7 +171,7 @@ export const TodayDashboardPage: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {metrics.activeLeadsCount} Leads
+                {metrics.activeLeadsCount} Enquiries
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs">
                 <span className="inline-flex items-center text-emerald-600 font-semibold">
@@ -193,27 +187,18 @@ export const TodayDashboardPage: React.FC = () => {
       {/* Pipeline Summary Breakdown */}
       <Card>
         <CardHeader
-          title="Sales Pipeline Funnel Summary"
-          subtitle="Real-time distribution of opportunity values by sales stage"
-          action={
-            <Link
-              to="/deals"
-              className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"
-            >
-              Kanban Board <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
-          }
+          title="Sales Pipeline Summary"
         />
         <CardBody>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {metrics.stageBreakdown.map((item, idx) => {
               const stageLabels: Record<string, string> = {
-                qualification: 'Qualification',
-                needs_analysis: 'Needs Analysis',
-                proposal_sent: 'Proposal Sent',
-                negotiation: 'Negotiation',
-                closed_won: 'Closed Won',
-                closed_lost: 'Closed Lost',
+                qualification: 'New',
+                needs_analysis: 'Qualified',
+                proposal_sent: 'Proposal',
+                negotiation: 'Discussion',
+                closed_won: 'Won',
+                closed_lost: 'Lost',
               };
 
               const colors = [
@@ -255,14 +240,6 @@ export const TodayDashboardPage: React.FC = () => {
           <CardHeader
             title="Today's Priority Follow-ups"
             subtitle="Scheduled customer calls, quote reviews, and action items"
-            action={
-              <Link
-                to="/tasks"
-                className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"
-              >
-                All Tasks <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            }
           />
           <CardBody className="p-0">
             <div className="divide-y divide-slate-100">
@@ -342,14 +319,6 @@ export const TodayDashboardPage: React.FC = () => {
           <CardHeader
             title="Activity Timeline"
             subtitle="Recent calls, quotations, closed sales, and notes"
-            action={
-              <Link
-                to="/activities"
-                className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"
-              >
-                Full Stream <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            }
           />
           <CardBody className="p-0">
             <div className="divide-y divide-slate-100">

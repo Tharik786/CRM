@@ -108,9 +108,6 @@ export const ActivityTimelinePage: React.FC = () => {
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
             Customer Activity Timeline
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Chronological audit log of client discussions, sales stage transitions, notes, and milestones
-          </p>
         </div>
 
         <Button

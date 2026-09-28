@@ -9,7 +9,10 @@ import {
   Activity,
   WorkspaceSettings,
   DealStage,
-  QuotationStatus
+  QuotationStatus,
+  Installation,
+  InstallerScheduleItem,
+  DeviceInventoryItem
 } from '../types/crm';
 import { crmService } from '../api/services/crmService';
 
@@ -31,7 +34,7 @@ interface CrmContextType {
   settings: WorkspaceSettings | null;
   isLoading: boolean;
   refreshAll: () => Promise<void>;
-  
+
   // Leads
   createLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Lead>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<Lead>;
@@ -77,6 +80,20 @@ interface CrmContextType {
     companies: Company[];
   };
 
+  // Operations
+  installations: Installation[];
+  installerSchedules: InstallerScheduleItem[];
+  deviceInventory: DeviceInventoryItem[];
+  createInstallation: (data: Omit<Installation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Installation>;
+  updateInstallation: (id: string, data: Partial<Installation>) => Promise<Installation>;
+  deleteInstallation: (id: string) => Promise<void>;
+  createInstallerSchedule: (data: Omit<InstallerScheduleItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<InstallerScheduleItem>;
+  updateInstallerSchedule: (id: string, data: Partial<InstallerScheduleItem>) => Promise<InstallerScheduleItem>;
+  deleteInstallerSchedule: (id: string) => Promise<void>;
+  createDeviceInventoryItem: (data: Omit<DeviceInventoryItem, 'id' | 'updatedAt'>) => Promise<DeviceInventoryItem>;
+  updateDeviceInventoryItem: (id: string, data: Partial<DeviceInventoryItem>) => Promise<DeviceInventoryItem>;
+  deleteDeviceInventoryItem: (id: string) => Promise<void>;
+
   // Toast
   toasts: ToastMessage[];
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
@@ -94,6 +111,9 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [settings, setSettings] = useState<WorkspaceSettings | null>(null);
+  const [installations, setInstallations] = useState<Installation[]>([]);
+  const [installerSchedules, setInstallerSchedules] = useState<InstallerScheduleItem[]>([]);
+  const [deviceInventory, setDeviceInventory] = useState<DeviceInventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -121,6 +141,9 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetchedTasks,
         fetchedActs,
         fetchedSettings,
+        fetchedInst,
+        fetchedSch,
+        fetchedDev,
       ] = await Promise.all([
         crmService.getLeads(),
         crmService.getDeals(),
@@ -130,6 +153,9 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         crmService.getTasks(),
         crmService.getActivities(),
         crmService.getSettings(),
+        crmService.getInstallations(),
+        crmService.getInstallerSchedules(),
+        crmService.getDeviceInventory(),
       ]);
 
       setLeads(fetchedLeads);
@@ -140,6 +166,9 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTasks(fetchedTasks);
       setActivities(fetchedActs);
       setSettings(fetchedSettings);
+      setInstallations(fetchedInst);
+      setInstallerSchedules(fetchedSch);
+      setDeviceInventory(fetchedDev);
     } catch (err) {
       console.error('Error fetching CRM data:', err);
       addToast({
@@ -334,9 +363,71 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetDatabase = async () => {
-    await crmService.resetData();
+    await crmService.clearAllData();
     await refreshAll();
-    addToast({ type: 'info', title: 'System Reset', message: 'All demo data has been re-seeded.' });
+    addToast({ type: 'info', title: 'Data Cleared', message: 'All CRM records have been reset to clean state.' });
+  };
+
+  // Operations Handlers
+  const createInstallation = async (data: Omit<Installation, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const res = await crmService.createInstallation(data);
+    setInstallations(prev => [res, ...prev]);
+    addToast({ type: 'success', title: 'Installation Scheduled', message: `Job for ${res.customerName} assigned to ${res.installer}.` });
+    refreshAll();
+    return res;
+  };
+
+  const updateInstallation = async (id: string, data: Partial<Installation>) => {
+    const res = await crmService.updateInstallation(id, data);
+    setInstallations(prev => prev.map(i => (i.id === id ? res : i)));
+    addToast({ type: 'success', title: 'Installation Updated', message: `Job for ${res.customerName} updated.` });
+    return res;
+  };
+
+  const deleteInstallation = async (id: string) => {
+    await crmService.deleteInstallation(id);
+    setInstallations(prev => prev.filter(i => i.id !== id));
+    addToast({ type: 'info', title: 'Installation Removed' });
+  };
+
+  const createInstallerSchedule = async (data: Omit<InstallerScheduleItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const res = await crmService.createInstallerSchedule(data);
+    setInstallerSchedules(prev => [res, ...prev]);
+    addToast({ type: 'success', title: 'Schedule Added', message: `Visit for ${res.installer} booked.` });
+    return res;
+  };
+
+  const updateInstallerSchedule = async (id: string, data: Partial<InstallerScheduleItem>) => {
+    const res = await crmService.updateInstallerSchedule(id, data);
+    setInstallerSchedules(prev => prev.map(s => (s.id === id ? res : s)));
+    addToast({ type: 'success', title: 'Schedule Updated', message: `Visit for ${res.installer} updated.` });
+    return res;
+  };
+
+  const deleteInstallerSchedule = async (id: string) => {
+    await crmService.deleteInstallerSchedule(id);
+    setInstallerSchedules(prev => prev.filter(s => s.id !== id));
+    addToast({ type: 'info', title: 'Schedule Slot Removed' });
+  };
+
+  const createDeviceInventoryItem = async (data: Omit<DeviceInventoryItem, 'id' | 'updatedAt'>) => {
+    const res = await crmService.createDeviceInventoryItem(data);
+    setDeviceInventory(prev => [res, ...prev]);
+    addToast({ type: 'success', title: 'Device Added', message: `${res.deviceName} added to inventory.` });
+    return res;
+  };
+
+  const updateDeviceInventoryItem = async (id: string, data: Partial<DeviceInventoryItem>) => {
+    const res = await crmService.updateDeviceInventoryItem(id, data);
+    setDeviceInventory(prev => prev.map(d => (d.id === id ? res : d)));
+    addToast({ type: 'success', title: 'Device Updated', message: `${res.deviceName} inventory updated.` });
+    return res;
+  };
+
+  const deleteDeviceInventoryItem = async (id: string) => {
+    await crmService.deleteDeviceInventoryItem(id);
+    setDeviceInventory(prev => prev.filter(d => d.id !== id));
+    addToast({ type: 'info', title: 'Device Removed' });
   };
 
   // Global Search
@@ -345,24 +436,24 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!q) return { deals: [], leads: [], contacts: [], companies: [] };
 
     return {
-      deals: deals.filter(d => 
-        d.title.toLowerCase().includes(q) || 
+      deals: deals.filter(d =>
+        d.title.toLowerCase().includes(q) ||
         d.companyName.toLowerCase().includes(q) ||
         d.contactName.toLowerCase().includes(q)
       ),
-      leads: leads.filter(l => 
-        l.name.toLowerCase().includes(q) || 
-        l.company.toLowerCase().includes(q) || 
+      leads: leads.filter(l =>
+        l.name.toLowerCase().includes(q) ||
+        l.company.toLowerCase().includes(q) ||
         l.email.toLowerCase().includes(q)
       ),
-      contacts: contacts.filter(c => 
-        c.name.toLowerCase().includes(q) || 
-        c.companyName.toLowerCase().includes(q) || 
+      contacts: contacts.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.companyName.toLowerCase().includes(q) ||
         c.email.toLowerCase().includes(q)
       ),
-      companies: companies.filter(c => 
-        c.name.toLowerCase().includes(q) || 
-        c.domain.toLowerCase().includes(q) || 
+      companies: companies.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.domain.toLowerCase().includes(q) ||
         c.industry.toLowerCase().includes(q)
       ),
     };
@@ -405,6 +496,18 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSettings,
         resetDatabase,
         globalSearch,
+        installations,
+        installerSchedules,
+        deviceInventory,
+        createInstallation,
+        updateInstallation,
+        deleteInstallation,
+        createInstallerSchedule,
+        updateInstallerSchedule,
+        deleteInstallerSchedule,
+        createDeviceInventoryItem,
+        updateDeviceInventoryItem,
+        deleteDeviceInventoryItem,
         toasts,
         addToast,
         removeToast,

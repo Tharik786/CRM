@@ -3,6 +3,7 @@ import { Task, TaskPriority, TaskType } from '../../types/crm';
 import { Modal } from '../common/Modal';
 import { Input, Select } from '../common/Input';
 import { Button } from '../common/Button';
+import { useAuth } from '../../context/AuthContext';
 
 interface TaskModalFormProps {
   isOpen: boolean;
@@ -17,10 +18,11 @@ export const TaskModalForm: React.FC<TaskModalFormProps> = ({
   onSubmit,
   initialData,
 }) => {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<TaskType>('follow_up');
-  const [priority, setPriority] = useState<TaskPriority>('high');
+  const [priority, setPriority] = useState<TaskPriority>('medium');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueTime, setDueTime] = useState('11:00 AM');
   const [relatedToName, setRelatedToName] = useState('');
@@ -70,7 +72,7 @@ export const TaskModalForm: React.FC<TaskModalFormProps> = ({
         status: initialData?.status || 'pending',
         dueDate,
         dueTime,
-        assignedTo: initialData?.assignedTo || 'usr_01',
+        assignedTo: initialData?.assignedTo || user?.id || 'usr_current',
         relatedToName,
       });
       onClose();

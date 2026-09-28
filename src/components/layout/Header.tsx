@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import { useCrm } from '../../context/CrmContext';
 import {
   Menu,
-  Search,
   Plus,
-  RefreshCw,
   Bell,
   CheckCircle2,
   ChevronDown,
@@ -15,11 +13,9 @@ import {
   CheckSquare,
   FileSpreadsheet
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 interface HeaderProps {
   onOpenMobileMenu: () => void;
-  onOpenSearch: () => void;
   onOpenNewLead?: () => void;
   onOpenNewDeal?: () => void;
   onOpenNewContact?: () => void;
@@ -29,62 +25,55 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenMobileMenu,
-  onOpenSearch,
   onOpenNewLead,
   onOpenNewDeal,
   onOpenNewContact,
   onOpenNewTask,
   onOpenNewQuote,
 }) => {
-  const { user } = useAuth();
-  const { refreshAll, isLoading, tasks } = useCrm();
+  const { tasks } = useCrm();
+  const location = useLocation();
+
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Auto-close popovers on route change
+  useEffect(() => {
+    setShowQuickMenu(false);
+    setShowNotifications(false);
+  }, [location.pathname]);
+
   const pendingTasksCount = tasks.filter(t => t.status !== 'completed').length;
+
+  const triggerAction = (action?: () => void) => {
+    setShowQuickMenu(false);
+    if (action) {
+      action();
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between">
-      {/* Left section: Mobile menu & Quick Search */}
-      <div className="flex items-center gap-3 flex-1 max-w-xl">
+      {/* Left section: Mobile menu */}
+      <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileMenu}
           className="lg:hidden p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100"
+          aria-label="Open Mobile Menu"
         >
           <Menu className="w-5 h-5" />
         </button>
-
-        {/* Global Search Bar */}
-        <button
-          onClick={onOpenSearch}
-          className="w-full max-w-md flex items-center justify-between px-3.5 py-2 text-xs text-slate-400 bg-slate-100 hover:bg-slate-200/70 border border-slate-200 rounded-xl transition-all shadow-inner"
-        >
-          <div className="flex items-center gap-2.5">
-            <Search className="w-4 h-4 text-slate-400" />
-            <span className="font-medium text-slate-500">Quick search deals, leads, clients...</span>
-          </div>
-          <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 rounded shadow-sm">
-            ⌘K
-          </kbd>
-        </button>
       </div>
 
-      {/* Right section: Quick actions, Sync, Notifications, Profile */}
+      {/* Right section: Quick actions, Notifications */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Refresh Sync Button */}
-        <button
-          onClick={() => refreshAll()}
-          disabled={isLoading}
-          title="Refresh Data"
-          className="p-2 text-slate-500 hover:text-brand-600 rounded-xl hover:bg-slate-100 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-brand-600' : ''}`} />
-        </button>
-
         {/* Quick Create Dropdown */}
         <div className="relative">
           <button
-            onClick={() => setShowQuickMenu(!showQuickMenu)}
+            onClick={() => {
+              setShowNotifications(false);
+              setShowQuickMenu(!showQuickMenu);
+            }}
             className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-sm transition-all"
           >
             <Plus className="w-4 h-4" />
@@ -94,54 +83,43 @@ export const Header: React.FC<HeaderProps> = ({
 
           {showQuickMenu && (
             <>
+              {/* Backdrop */}
               <div
-                className="fixed inset-0 z-40"
+                className="fixed inset-0 z-30"
                 onClick={() => setShowQuickMenu(false)}
               />
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-50 animate-fade-in">
+              <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-30 animate-fade-in">
                 {onOpenNewLead && (
                   <button
-                    onClick={() => {
-                      setShowQuickMenu(false);
-                      onOpenNewLead();
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5"
+                    onClick={() => triggerAction(onOpenNewLead)}
+                    className="w-full px-3.5 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5 transition-colors"
                   >
                     <Target className="w-4 h-4 text-amber-500" />
-                    New Sales Lead
-                  </button>
-                )}
-                {onOpenNewDeal && (
-                  <button
-                    onClick={() => {
-                      setShowQuickMenu(false);
-                      onOpenNewDeal();
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5"
-                  >
-                    <Briefcase className="w-4 h-4 text-brand-600" />
-                    New Pipeline Deal
+                    New Enquiry
                   </button>
                 )}
                 {onOpenNewContact && (
                   <button
-                    onClick={() => {
-                      setShowQuickMenu(false);
-                      onOpenNewContact();
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5"
+                    onClick={() => triggerAction(onOpenNewContact)}
+                    className="w-full px-3.5 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5 transition-colors"
                   >
                     <Users className="w-4 h-4 text-emerald-500" />
-                    New Contact
+                    New Client
+                  </button>
+                )}
+                {onOpenNewDeal && (
+                  <button
+                    onClick={() => triggerAction(onOpenNewDeal)}
+                    className="w-full px-3.5 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5 transition-colors"
+                  >
+                    <Briefcase className="w-4 h-4 text-brand-600" />
+                    New Sales Pipeline Deal
                   </button>
                 )}
                 {onOpenNewTask && (
                   <button
-                    onClick={() => {
-                      setShowQuickMenu(false);
-                      onOpenNewTask();
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5"
+                    onClick={() => triggerAction(onOpenNewTask)}
+                    className="w-full px-3.5 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5 transition-colors"
                   >
                     <CheckSquare className="w-4 h-4 text-blue-500" />
                     New Task / Reminder
@@ -149,11 +127,8 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
                 {onOpenNewQuote && (
                   <button
-                    onClick={() => {
-                      setShowQuickMenu(false);
-                      onOpenNewQuote();
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5"
+                    onClick={() => triggerAction(onOpenNewQuote)}
+                    className="w-full px-3.5 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5 transition-colors"
                   >
                     <FileSpreadsheet className="w-4 h-4 text-purple-500" />
                     New Quotation
@@ -167,7 +142,10 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Notifications Popover */}
         <div className="relative">
           <button
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={() => {
+              setShowQuickMenu(false);
+              setShowNotifications(!showNotifications);
+            }}
             className="relative p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
           >
             <Bell className="w-4 h-4" />
@@ -179,10 +157,10 @@ export const Header: React.FC<HeaderProps> = ({
           {showNotifications && (
             <>
               <div
-                className="fixed inset-0 z-40"
+                className="fixed inset-0 z-30"
                 onClick={() => setShowNotifications(false)}
               />
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-50 animate-fade-in">
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-30 animate-fade-in">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                     Reminders & Actions ({pendingTasksCount})
@@ -216,19 +194,6 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </div>
-
-        {/* User Mini Avatar Link */}
-        <Link
-          to="/settings"
-          className="flex items-center pl-1.5"
-          title="Account Settings"
-        >
-          <img
-            src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80'}
-            alt="Profile"
-            className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-100 hover:ring-brand-400 transition-all"
-          />
-        </Link>
       </div>
     </header>
   );

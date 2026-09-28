@@ -5,6 +5,7 @@ import { Input, Select } from '../common/Input';
 import { Button } from '../common/Button';
 import { Plus, Trash2 } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
+import { useAuth } from '../../context/AuthContext';
 
 interface QuotationModalFormProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
   onSubmit,
   initialData,
 }) => {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
@@ -29,18 +31,18 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
   const [validUntil, setValidUntil] = useState(
     new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
   );
-  const [taxRate, setTaxRate] = useState(10);
+  const [taxRate, setTaxRate] = useState(0);
   const [terms, setTerms] = useState('Payment within 30 days of invoice date.');
   const [notes, setNotes] = useState('');
 
   const [lineItems, setLineItems] = useState<QuotationLineItem[]>([
     {
-      id: 'li_1',
-      description: 'ZanCRM Platform License (Annual)',
+      id: `li_${Date.now()}`,
+      description: '',
       quantity: 1,
-      unitPrice: 45000,
+      unitPrice: 0,
       discount: 0,
-      amount: 45000,
+      amount: 0,
     },
   ]);
 
@@ -62,7 +64,7 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
       setNotes(initialData.notes || '');
       setLineItems(initialData.lineItems);
     } else {
-      setTitle('Enterprise Subscription Agreement');
+      setTitle('');
       setCompanyName('');
       setContactName('');
       setContactEmail('');
@@ -70,17 +72,17 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
       setStatus('draft');
       setIssueDate(new Date().toISOString().split('T')[0]);
       setValidUntil(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
-      setTaxRate(10);
+      setTaxRate(0);
       setTerms('Payment within 30 days of invoice date.');
-      setNotes('Includes standard SLA, 99.9% uptime guarantee, and priority onboarding support.');
+      setNotes('');
       setLineItems([
         {
           id: `li_${Date.now()}`,
-          description: 'ZanCRM Platform License (Annual)',
+          description: '',
           quantity: 1,
-          unitPrice: 45000,
+          unitPrice: 0,
           discount: 0,
-          amount: 45000,
+          amount: 0,
         },
       ]);
     }
@@ -143,7 +145,7 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
         title,
         companyName,
         contactName,
-        contactEmail: contactEmail || `${contactName.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+        contactEmail: contactEmail.trim(),
         dealTitle,
         status,
         issueDate,
@@ -155,7 +157,7 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
         total,
         terms,
         notes,
-        createdBy: 'Alex Rivera',
+        createdBy: user?.name || 'User',
       });
       onClose();
     } finally {

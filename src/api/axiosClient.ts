@@ -1,5 +1,5 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import { MockStorageServer } from './mockServer';
+import { CrmStorage } from './storage';
 
 // Base Axios Instance
 export const apiClient = axios.create({
@@ -13,7 +13,7 @@ export const apiClient = axios.create({
 // Request Interceptor: Attach Auth Token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = MockStorageServer.getToken();
+    const token = CrmStorage.getToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }

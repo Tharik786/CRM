@@ -2,25 +2,21 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { GlobalSearchModal } from './GlobalSearchModal';
 import { ToastContainer } from '../common/ToastContainer';
 import { useCrm } from '../../context/CrmContext';
+
+// Dynamic creation modal imports
 import { LeadModalForm } from '../forms/LeadModalForm';
 import { DealModalForm } from '../forms/DealModalForm';
 import { ContactModalForm } from '../forms/ContactModalForm';
 import { TaskModalForm } from '../forms/TaskModalForm';
 import { QuotationModalForm } from '../forms/QuotationModalForm';
 
+type GlobalModalType = 'lead' | 'deal' | 'contact' | 'task' | 'quotation' | null;
+
 export const AppLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-
-  // Global Quick Modals
-  const [leadModalOpen, setLeadModalOpen] = useState(false);
-  const [dealModalOpen, setDealModalOpen] = useState(false);
-  const [contactModalOpen, setContactModalOpen] = useState(false);
-  const [taskModalOpen, setTaskModalOpen] = useState(false);
-  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [activeGlobalModal, setActiveGlobalModal] = useState<GlobalModalType>(null);
 
   const { createLead, createDeal, createContact, createTask, createQuotation } = useCrm();
 
@@ -37,69 +33,78 @@ export const AppLayout: React.FC = () => {
         {/* Sticky Header */}
         <Header
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
-          onOpenSearch={() => setSearchOpen(true)}
-          onOpenNewLead={() => setLeadModalOpen(true)}
-          onOpenNewDeal={() => setDealModalOpen(true)}
-          onOpenNewContact={() => setContactModalOpen(true)}
-          onOpenNewTask={() => setTaskModalOpen(true)}
-          onOpenNewQuote={() => setQuoteModalOpen(true)}
+          onOpenNewLead={() => setActiveGlobalModal('lead')}
+          onOpenNewDeal={() => setActiveGlobalModal('deal')}
+          onOpenNewContact={() => setActiveGlobalModal('contact')}
+          onOpenNewTask={() => setActiveGlobalModal('task')}
+          onOpenNewQuote={() => setActiveGlobalModal('quotation')}
         />
 
         {/* Page Content Viewport */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 px-4 pt-3.5 pb-8 sm:px-6 sm:pt-4 sm:pb-8 md:px-8 md:pt-4 md:pb-8 w-full max-w-[1600px] mx-auto">
           <Outlet />
         </main>
       </div>
 
-      {/* Global Command Palette / Search Dialog */}
-      <GlobalSearchModal
-        isOpen={searchOpen}
-        onClose={() => setSearchOpen(false)}
-      />
 
       {/* Floating System Toasts */}
       <ToastContainer />
 
-      {/* Global Quick Creation Modals */}
-      <LeadModalForm
-        isOpen={leadModalOpen}
-        onClose={() => setLeadModalOpen(false)}
-        onSubmit={async data => {
-          await createLead(data);
-        }}
-      />
+      {/* Conditionally rendered global modals */}
+      {activeGlobalModal === 'lead' && (
+        <LeadModalForm
+          isOpen={true}
+          onClose={() => setActiveGlobalModal(null)}
+          onSubmit={async data => {
+            await createLead(data);
+            setActiveGlobalModal(null);
+          }}
+        />
+      )}
 
-      <DealModalForm
-        isOpen={dealModalOpen}
-        onClose={() => setDealModalOpen(false)}
-        onSubmit={async data => {
-          await createDeal(data);
-        }}
-      />
+      {activeGlobalModal === 'deal' && (
+        <DealModalForm
+          isOpen={true}
+          onClose={() => setActiveGlobalModal(null)}
+          onSubmit={async data => {
+            await createDeal(data);
+            setActiveGlobalModal(null);
+          }}
+        />
+      )}
 
-      <ContactModalForm
-        isOpen={contactModalOpen}
-        onClose={() => setContactModalOpen(false)}
-        onSubmit={async data => {
-          await createContact(data);
-        }}
-      />
+      {activeGlobalModal === 'contact' && (
+        <ContactModalForm
+          isOpen={true}
+          onClose={() => setActiveGlobalModal(null)}
+          onSubmit={async data => {
+            await createContact(data);
+            setActiveGlobalModal(null);
+          }}
+        />
+      )}
 
-      <TaskModalForm
-        isOpen={taskModalOpen}
-        onClose={() => setTaskModalOpen(false)}
-        onSubmit={async data => {
-          await createTask(data);
-        }}
-      />
+      {activeGlobalModal === 'task' && (
+        <TaskModalForm
+          isOpen={true}
+          onClose={() => setActiveGlobalModal(null)}
+          onSubmit={async data => {
+            await createTask(data);
+            setActiveGlobalModal(null);
+          }}
+        />
+      )}
 
-      <QuotationModalForm
-        isOpen={quoteModalOpen}
-        onClose={() => setQuoteModalOpen(false)}
-        onSubmit={async data => {
-          await createQuotation(data);
-        }}
-      />
+      {activeGlobalModal === 'quotation' && (
+        <QuotationModalForm
+          isOpen={true}
+          onClose={() => setActiveGlobalModal(null)}
+          onSubmit={async data => {
+            await createQuotation(data);
+            setActiveGlobalModal(null);
+          }}
+        />
+      )}
     </div>
   );
 };

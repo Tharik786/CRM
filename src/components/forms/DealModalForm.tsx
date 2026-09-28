@@ -3,6 +3,7 @@ import { Deal, DealStage } from '../../types/crm';
 import { Modal } from '../common/Modal';
 import { Input, Select } from '../common/Input';
 import { Button } from '../common/Button';
+import { useAuth } from '../../context/AuthContext';
 
 interface DealModalFormProps {
   isOpen: boolean;
@@ -17,16 +18,17 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
   onSubmit,
   initialData,
 }) => {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
-  const [value, setValue] = useState(50000);
+  const [value, setValue] = useState(0);
   const [stage, setStage] = useState<DealStage>('qualification');
-  const [probability, setProbability] = useState(30);
+  const [probability, setProbability] = useState(50);
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
   const [expectedCloseDate, setExpectedCloseDate] = useState(
     new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
   );
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('high');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [tagsInput, setTagsInput] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,14 +46,14 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
       setTagsInput(initialData.tags?.join(', ') || '');
     } else {
       setTitle('');
-      setValue(60000);
+      setValue(0);
       setStage('qualification');
-      setProbability(25);
+      setProbability(50);
       setCompanyName('');
       setContactName('');
       setExpectedCloseDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
-      setPriority('high');
-      setTagsInput('Enterprise, Q4');
+      setPriority('medium');
+      setTagsInput('');
     }
     setErrors({});
   }, [initialData, isOpen]);
@@ -85,8 +87,8 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
         probability: Number(probability),
         expectedCloseDate,
         companyName,
-        contactName: contactName || 'Primary Stakeholder',
-        assignedTo: initialData?.assignedTo || 'usr_01',
+        contactName: contactName.trim(),
+        assignedTo: initialData?.assignedTo || user?.id || 'usr_current',
         priority,
         tags,
       });
@@ -100,7 +102,7 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialData ? 'Edit Opportunity' : 'New Sales Opportunity'}
+      title={initialData ? 'Edit Deal' : 'New Sales Pipeline Deal'}
       subtitle="Track deal value, milestones, and expected closing schedule"
       maxWidth="lg"
     >
@@ -168,12 +170,12 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
               if (newStage === 'closed_lost') setProbability(0);
             }}
             options={[
-              { value: 'qualification', label: '1. Qualification' },
-              { value: 'needs_analysis', label: '2. Needs Analysis' },
-              { value: 'proposal_sent', label: '3. Proposal Sent' },
-              { value: 'negotiation', label: '4. Negotiation' },
-              { value: 'closed_won', label: '5. Closed Won' },
-              { value: 'closed_lost', label: '6. Closed Lost' },
+              { value: 'qualification', label: '1. New' },
+              { value: 'needs_analysis', label: '2. Qualified' },
+              { value: 'proposal_sent', label: '3. Proposal' },
+              { value: 'negotiation', label: '4. Discussion' },
+              { value: 'closed_won', label: '5. Won' },
+              { value: 'closed_lost', label: '6. Lost' },
             ]}
           />
           <Select

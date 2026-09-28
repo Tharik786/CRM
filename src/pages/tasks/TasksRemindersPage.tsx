@@ -30,7 +30,7 @@ export const TasksRemindersPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  const todayStr = '2026-09-26'; // fixed app local demo date
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
@@ -93,9 +93,6 @@ export const TasksRemindersPage: React.FC = () => {
               {tasks.filter(t => t.status !== 'completed').length} Pending
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Keep commitments on schedule with proactive task reminders, discovery calls, and proposal deliverables
-          </p>
         </div>
 
         <div className="flex items-center gap-2.5">

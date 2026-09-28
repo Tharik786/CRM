@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useCrm } from '../../context/CrmContext';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
@@ -7,8 +8,8 @@ export const ToastContainer: React.FC = () => {
 
   if (toasts.length === 0) return null;
 
-  return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col space-y-2.5 max-w-sm w-full pointer-events-none">
+  return createPortal(
+    <div className="fixed bottom-5 right-5 z-[120] flex flex-col space-y-2.5 max-w-sm w-full pointer-events-none">
       {toasts.map(toast => {
         const icons = {
           success: <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />,
@@ -41,6 +42,7 @@ export const ToastContainer: React.FC = () => {
           </div>
         );
       })}
-    </div>
+    </div>,
+    document.body
   );
 };

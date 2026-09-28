@@ -361,11 +361,8 @@ export const ContactsCompaniesPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Accounts & Contacts Directory
+            Clients & Accounts Directory
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Maintain accurate corporate relationship maps, stakeholder details, and key communication channels
-          </p>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -385,7 +382,7 @@ export const ContactsCompaniesPage: React.FC = () => {
               onClick={() => handleOpenContactModal()}
               icon={<Plus className="w-4 h-4" />}
             >
-              Add Contact
+              Add Client
             </Button>
           ) : (
             <Button
@@ -416,7 +413,7 @@ export const ContactsCompaniesPage: React.FC = () => {
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Contacts ({contacts.length})</span>
+            <span>Clients ({contacts.length})</span>
           </button>
           <button
             onClick={() => {
@@ -446,7 +443,7 @@ export const ContactsCompaniesPage: React.FC = () => {
             }}
             placeholder={
               activeTab === 'contacts'
-                ? 'Search contacts by name, company, email...'
+                ? 'Search clients by name, company, email...'
                 : 'Search companies by name, domain, industry...'
             }
             className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
@@ -462,7 +459,7 @@ export const ContactsCompaniesPage: React.FC = () => {
             data={paginatedContacts}
             keyExtractor={c => c.id}
             isLoading={isLoading}
-            emptyMessage="No contacts found."
+            emptyMessage="No clients found."
           />
         ) : (
           <Table

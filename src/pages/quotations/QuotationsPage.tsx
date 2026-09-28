@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCrm } from '../../context/CrmContext';
+import { useAuth } from '../../context/AuthContext';
 import { Quotation, QuotationStatus } from '../../types/crm';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
@@ -21,7 +22,8 @@ import {
 } from 'lucide-react';
 
 export const QuotationsPage: React.FC = () => {
-  const { quotations, createQuotation, updateQuotationStatus, deleteQuotation, isLoading } = useCrm();
+  const { quotations, createQuotation, updateQuotationStatus, deleteQuotation, settings, isLoading } = useCrm();
+  const { user } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -203,9 +205,6 @@ export const QuotationsPage: React.FC = () => {
               {quotations.length} Proposals
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Build itemized proposals, calculate multi-tier licenses, and formalize enterprise contracts
-          </p>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -319,11 +318,9 @@ export const QuotationsPage: React.FC = () => {
             <div className="flex items-start justify-between border-b border-slate-200 pb-6">
               <div>
                 <div className="flex items-center gap-2 text-brand-600 font-extrabold text-xl">
-                  <span>ZanCRM Systems Inc.</span>
+                  <span>{settings?.companyName || 'Commercial Quotation'}</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">100 Enterprise Way, Suite 400</p>
-                <p className="text-xs text-slate-500">San Francisco, CA 94107</p>
-                <p className="text-xs text-slate-500">sales@zancrm.internal</p>
+                {user?.email && <p className="text-xs text-slate-500 mt-1">{user.email}</p>}
               </div>
 
               <div className="text-right">
@@ -354,8 +351,7 @@ export const QuotationsPage: React.FC = () => {
                 <span className="font-bold text-slate-500 uppercase tracking-wider block mb-1">
                   Prepared By:
                 </span>
-                <p className="font-extrabold text-slate-900 text-sm">{previewQuote.createdBy}</p>
-                <p className="text-slate-600">Enterprise Revenue Team</p>
+                <p className="font-extrabold text-slate-900 text-sm">{previewQuote.createdBy || user?.name || 'Sales Representative'}</p>
                 {previewQuote.dealTitle && (
                   <p className="text-slate-600 mt-1 font-semibold">Deal: {previewQuote.dealTitle}</p>
                 )}

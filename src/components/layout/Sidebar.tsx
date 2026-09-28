@@ -5,17 +5,16 @@ import {
   LayoutDashboard,
   Users,
   Target,
-  KanbanSquare,
+  Briefcase,
   FileSpreadsheet,
   CheckSquare,
   Clock,
-  Database,
   BarChart3,
   Settings,
   LogOut,
-  Sparkles,
   ChevronRight,
   ShieldCheck,
+  Wrench,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -33,16 +32,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
   };
 
   const navItems = [
-    { label: 'Today Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Leads', path: '/leads', icon: Target },
-    { label: 'Deals & Pipeline', path: '/deals', icon: KanbanSquare },
-    { label: 'Contacts & Companies', path: '/contacts', icon: Users },
+    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Enquiries', path: '/leads', icon: Target },
+    { label: 'Clients', path: '/contacts', icon: Users },
+    { label: 'Sales Pipeline', path: '/deals', icon: Briefcase },
     { label: 'Quotations', path: '/quotations', icon: FileSpreadsheet },
+    { label: 'Operations', path: '/operations', icon: Wrench },
     { label: 'Tasks & Reminders', path: '/tasks', icon: CheckSquare },
     { label: 'Activity Timeline', path: '/activities', icon: Clock },
-    { label: 'Search & Data Sync', path: '/data', icon: Database },
     { label: 'Sales Reports', path: '/reports', icon: BarChart3 },
-    { label: 'Workspace Settings', path: '/settings', icon: Settings },
+    { label: 'Setting', path: '/settings', icon: Settings },
   ];
 
   return (
@@ -57,35 +56,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
 
       {/* Sidebar Aside */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col transition-transform duration-200 ease-in-out lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        } border-r border-slate-800`}
+        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col no-scrollbar transition-transform duration-200 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          } border-r border-slate-800`}
       >
         {/* Brand Logo Header */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-base tracking-tight text-white font-sans">
-                  Zan<span className="text-brand-400">CRM</span>
-                </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 border border-brand-500/30">
-                  PRO
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium">Sales & Revenue Ops</p>
-            </div>
+        <div className="h-16 px-5 flex items-center justify-between border-b border-slate-800/80">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img
+              src="/favicon.png"
+              alt="ZanCompute Logo"
+              className="h-8 w-8 object-contain shrink-0"
+            />
+            <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-sans truncate">
+              ZanCompute <span className="text-brand-400">CRM</span>
+            </span>
           </div>
         </div>
 
         {/* Navigation Modules */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Core Modules
-          </div>
+        <div className="flex-1 overflow-y-auto no-scrollbar px-3 py-4 space-y-1">
           {navItems.map(item => {
             const Icon = item.icon;
             return (
@@ -94,10 +83,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
                 to={item.path}
                 onClick={onCloseMobile}
                 className={({ isActive }) =>
-                  `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
-                    isActive
-                      ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30 font-bold'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                  `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${isActive
+                    ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30 font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                   }`
                 }
               >
@@ -113,18 +101,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
 
         {/* User Card & Logout Footer */}
         <div className="p-3 border-t border-slate-800 bg-slate-950/40">
-          <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-800/50 border border-slate-800">
-            <img
-              src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80'}
-              alt={user?.name || 'User'}
-              className="h-8 w-8 rounded-lg object-cover ring-1 ring-brand-500/40"
-            />
-            <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-800/50 border border-slate-800">
+            <div className="flex-1 min-w-0 px-1">
               <div className="flex items-center gap-1">
-                <p className="text-xs font-bold text-white truncate">{user?.name || 'Alex Rivera'}</p>
+                <p className="text-xs font-bold text-white truncate">{user?.name || 'User'}</p>
                 <ShieldCheck className="w-3.5 h-3.5 text-brand-400 shrink-0" />
               </div>
-              <p className="text-[10px] text-slate-400 truncate">{user?.role ? user.role.replace('_', ' ') : 'Sales Lead'}</p>
+              <p className="text-[10px] text-slate-400 truncate">{user?.role ? user.role.replace('_', ' ') : 'Administrator'}</p>
             </div>
             <button
               onClick={handleLogout}

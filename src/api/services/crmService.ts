@@ -10,65 +10,92 @@ import {
   WorkspaceSettings,
   DashboardMetrics,
   DealStage,
-  QuotationStatus
+  QuotationStatus,
+  Installation,
+  InstallerScheduleItem,
+  DeviceInventoryItem
 } from '../../types/crm';
-import { MockStorageServer } from '../mockServer';
+import { CrmStorage } from '../storage';
 
-// Simulated latency helper for authentic asynchronous REST feel
-const delay = (ms: number = 180) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number = 80) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const crmService = {
   // === AUTHENTICATION ===
-  async login(email: string, _password?: string): Promise<{ user: User; token: string }> {
-    await delay(300);
+  async login(email: string, _password?: string, name?: string): Promise<{ user: User; token: string }> {
+    await delay(150);
     if (!email || !email.includes('@')) {
       throw new Error('Please enter a valid email address.');
     }
-    const user = MockStorageServer.getUser();
-    user.email = email;
+
+    const resolvedName = name?.trim() || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const existingUser = CrmStorage.getUser();
+
+    const user: User = {
+      id: existingUser?.id || `usr_${Date.now()}`,
+      name: resolvedName,
+      email: email.trim(),
+      role: existingUser?.role || 'admin',
+      avatar: existingUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedName)}&background=4f46e5&color=fff`,
+      title: existingUser?.title || 'Administrator',
+      phone: existingUser?.phone || '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      notificationsEnabled: true,
+    };
+
     const token = `zancrm_token_${Date.now()}`;
-    MockStorageServer.setUser(user);
-    MockStorageServer.setToken(token);
+    CrmStorage.setUser(user);
+    CrmStorage.setToken(token);
     return { user, token };
   },
 
   async logout(): Promise<void> {
-    await delay(100);
-    MockStorageServer.setToken(null);
+    await delay(50);
+    CrmStorage.setToken(null);
   },
 
-  async getCurrentUser(): Promise<User> {
-    await delay(100);
-    return MockStorageServer.getUser();
+  async getCurrentUser(): Promise<User | null> {
+    await delay(50);
+    return CrmStorage.getUser();
   },
 
   async updateCurrentUser(data: Partial<User>): Promise<User> {
-    await delay(150);
-    const current = MockStorageServer.getUser();
-    const updated = { ...current, ...data };
-    MockStorageServer.setUser(updated);
+    await delay(80);
+    const current = CrmStorage.getUser();
+    const updated: User = {
+      id: current?.id || `usr_${Date.now()}`,
+      name: data.name || current?.name || 'User',
+      email: data.email || current?.email || '',
+      role: data.role || current?.role || 'admin',
+      avatar: data.avatar || current?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || current?.name || 'User')}&background=4f46e5&color=fff`,
+      title: data.title || current?.title || '',
+      phone: data.phone || current?.phone || '',
+      timezone: data.timezone || current?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      notificationsEnabled: data.notificationsEnabled ?? current?.notificationsEnabled ?? true,
+      ...data,
+    };
+    CrmStorage.setUser(updated);
     return updated;
   },
 
   // === DASHBOARD & METRICS ===
   async getDashboardMetrics(): Promise<DashboardMetrics> {
-    await delay(200);
-    const deals = MockStorageServer.getDeals();
-    const leads = MockStorageServer.getLeads();
-    const tasks = MockStorageServer.getTasks();
-    const activities = MockStorageServer.getActivities();
+    await delay(100);
+    const deals = CrmStorage.getDeals();
+    const leads = CrmStorage.getLeads();
+    const tasks = CrmStorage.getTasks();
+    const activities = CrmStorage.getActivities();
 
     const wonDeals = deals.filter(d => d.stage === 'closed_won');
     const closedDeals = deals.filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost');
-    
+
     const totalRevenue = wonDeals.reduce((sum, d) => sum + d.value, 0);
     const pipelineValue = deals
       .filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
       .reduce((sum, d) => sum + d.value, 0);
 
-    const winRate = closedDeals.length > 0 
-      ? Math.round((wonDeals.length / closedDeals.length) * 100) 
-      : 65;
+    const winRate = closedDeals.length > 0
+      ? Math.round((wonDeals.length / closedDeals.length) * 100)
+      : 0;
 
     const stages: DealStage[] = ['qualification', 'needs_analysis', 'proposal_sent', 'negotiation', 'closed_won', 'closed_lost'];
     const stageBreakdown = stages.map(st => {
@@ -86,13 +113,13 @@ export const crmService = {
 
     return {
       totalRevenue,
-      revenueChange: 14.8,
+      revenueChange: totalRevenue > 0 ? 12.5 : 0,
       dealsWonCount: wonDeals.length,
-      dealsWonChange: 22.5,
+      dealsWonChange: wonDeals.length > 0 ? 10 : 0,
       activeLeadsCount: leads.filter(l => l.status !== 'converted' && l.status !== 'unqualified').length,
-      leadsChange: 8.4,
+      leadsChange: leads.length > 0 ? 5 : 0,
       winRate,
-      winRateChange: 4.2,
+      winRateChange: winRate > 0 ? 2.5 : 0,
       pipelineValue,
       stageBreakdown,
       recentActivities: activities.slice(0, 6),
@@ -103,25 +130,27 @@ export const crmService = {
   // === LEADS ===
   async getLeads(): Promise<Lead[]> {
     await delay();
-    return MockStorageServer.getLeads();
+    return CrmStorage.getLeads();
   },
 
   async createLead(leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {
     await delay();
+    const currentUser = CrmStorage.getUser();
     const newLead: Lead = {
       ...leadData,
       id: `lead_${Date.now()}`,
+      assignedTo: leadData.assignedTo || currentUser?.id || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    MockStorageServer.saveLead(newLead);
-    MockStorageServer.addActivity({
+    CrmStorage.saveLead(newLead);
+    CrmStorage.addActivity({
       id: `act_${Date.now()}`,
       type: 'note',
-      title: `New lead captured: ${newLead.name}`,
+      title: `New lead added: ${newLead.name}`,
       description: `Company: ${newLead.company}, Est Value: $${newLead.estimatedValue.toLocaleString()}`,
-      performedBy: MockStorageServer.getUser().name,
-      performedById: MockStorageServer.getUser().id,
+      performedBy: currentUser?.name || 'User',
+      performedById: currentUser?.id || '',
       timestamp: new Date().toISOString(),
       relatedToType: 'lead',
       relatedToId: newLead.id,
@@ -132,27 +161,28 @@ export const crmService = {
 
   async updateLead(id: string, leadData: Partial<Lead>): Promise<Lead> {
     await delay();
-    const leads = MockStorageServer.getLeads();
+    const leads = CrmStorage.getLeads();
     const current = leads.find(l => l.id === id);
     if (!current) throw new Error('Lead not found');
     const updated = { ...current, ...leadData, updatedAt: new Date().toISOString() };
-    return MockStorageServer.saveLead(updated);
+    return CrmStorage.saveLead(updated);
   },
 
   async deleteLead(id: string): Promise<void> {
     await delay();
-    MockStorageServer.deleteLead(id);
+    CrmStorage.deleteLead(id);
   },
 
   async convertLeadToDeal(leadId: string): Promise<{ deal: Deal; contact: Contact }> {
-    await delay(250);
-    const leads = MockStorageServer.getLeads();
+    await delay(150);
+    const leads = CrmStorage.getLeads();
     const lead = leads.find(l => l.id === leadId);
     if (!lead) throw new Error('Lead not found');
 
+    const currentUser = CrmStorage.getUser();
     lead.status = 'converted';
     lead.updatedAt = new Date().toISOString();
-    MockStorageServer.saveLead(lead);
+    CrmStorage.saveLead(lead);
 
     // Create Contact
     const contact: Contact = {
@@ -160,42 +190,42 @@ export const crmService = {
       name: lead.name,
       email: lead.email,
       phone: lead.phone,
-      title: 'Prospect / Decision Maker',
+      title: 'Contact',
       companyName: lead.company,
-      lifecycleStage: 'lead',
+      lifecycleStage: 'customer',
       lastActivityAt: new Date().toISOString(),
-      assignedTo: lead.assignedTo,
+      assignedTo: lead.assignedTo || currentUser?.id || '',
       createdAt: new Date().toISOString(),
     };
-    MockStorageServer.saveContact(contact);
+    CrmStorage.saveContact(contact);
 
     // Create Deal
     const deal: Deal = {
       id: `deal_${Date.now()}`,
-      title: `${lead.company} - Expansion Deal`,
-      value: lead.estimatedValue || 50000,
+      title: `${lead.company} - Opportunity`,
+      value: lead.estimatedValue || 0,
       currency: 'USD',
       stage: 'qualification',
-      probability: 30,
+      probability: 50,
       expectedCloseDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       companyName: lead.company,
       contactId: contact.id,
       contactName: contact.name,
-      assignedTo: lead.assignedTo,
+      assignedTo: lead.assignedTo || currentUser?.id || '',
       priority: 'high',
       tags: ['Converted Lead'],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    MockStorageServer.saveDeal(deal);
+    CrmStorage.saveDeal(deal);
 
-    MockStorageServer.addActivity({
+    CrmStorage.addActivity({
       id: `act_${Date.now()}`,
       type: 'deal_stage_changed',
       title: `Lead converted to Deal: ${deal.title}`,
       description: `Converted from lead ${lead.name}. Valued at $${deal.value.toLocaleString()}`,
-      performedBy: MockStorageServer.getUser().name,
-      performedById: MockStorageServer.getUser().id,
+      performedBy: currentUser?.name || 'User',
+      performedById: currentUser?.id || '',
       timestamp: new Date().toISOString(),
       relatedToType: 'deal',
       relatedToId: deal.id,
@@ -208,25 +238,27 @@ export const crmService = {
   // === DEALS ===
   async getDeals(): Promise<Deal[]> {
     await delay();
-    return MockStorageServer.getDeals();
+    return CrmStorage.getDeals();
   },
 
   async createDeal(dealData: Omit<Deal, 'id' | 'createdAt' | 'updatedAt'>): Promise<Deal> {
     await delay();
+    const currentUser = CrmStorage.getUser();
     const newDeal: Deal = {
       ...dealData,
       id: `deal_${Date.now()}`,
+      assignedTo: dealData.assignedTo || currentUser?.id || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    MockStorageServer.saveDeal(newDeal);
-    MockStorageServer.addActivity({
+    CrmStorage.saveDeal(newDeal);
+    CrmStorage.addActivity({
       id: `act_${Date.now()}`,
       type: 'deal_stage_changed',
       title: `Opportunity created: ${newDeal.title}`,
       description: `Value: $${newDeal.value.toLocaleString()} in stage ${newDeal.stage}`,
-      performedBy: MockStorageServer.getUser().name,
-      performedById: MockStorageServer.getUser().id,
+      performedBy: currentUser?.name || 'User',
+      performedById: currentUser?.id || '',
       timestamp: new Date().toISOString(),
       relatedToType: 'deal',
       relatedToId: newDeal.id,
@@ -237,59 +269,61 @@ export const crmService = {
 
   async updateDeal(id: string, dealData: Partial<Deal>): Promise<Deal> {
     await delay();
-    const deals = MockStorageServer.getDeals();
+    const deals = CrmStorage.getDeals();
     const current = deals.find(d => d.id === id);
     if (!current) throw new Error('Deal not found');
     const updated = { ...current, ...dealData, updatedAt: new Date().toISOString() };
-    return MockStorageServer.saveDeal(updated);
+    return CrmStorage.saveDeal(updated);
   },
 
   async updateDealStage(id: string, stage: DealStage): Promise<Deal> {
-    await delay(120);
-    const deal = MockStorageServer.updateDealStage(id, stage);
+    await delay(80);
+    const deal = CrmStorage.updateDealStage(id, stage);
     if (!deal) throw new Error('Deal not found');
     return deal;
   },
 
   async deleteDeal(id: string): Promise<void> {
     await delay();
-    MockStorageServer.deleteDeal(id);
+    CrmStorage.deleteDeal(id);
   },
 
   // === CONTACTS & COMPANIES ===
   async getContacts(): Promise<Contact[]> {
     await delay();
-    return MockStorageServer.getContacts();
+    return CrmStorage.getContacts();
   },
 
   async createContact(contactData: Omit<Contact, 'id' | 'createdAt' | 'lastActivityAt'>): Promise<Contact> {
     await delay();
+    const currentUser = CrmStorage.getUser();
     const newContact: Contact = {
       ...contactData,
       id: `cont_${Date.now()}`,
+      assignedTo: contactData.assignedTo || currentUser?.id || '',
       lastActivityAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     };
-    return MockStorageServer.saveContact(newContact);
+    return CrmStorage.saveContact(newContact);
   },
 
   async updateContact(id: string, contactData: Partial<Contact>): Promise<Contact> {
     await delay();
-    const list = MockStorageServer.getContacts();
+    const list = CrmStorage.getContacts();
     const current = list.find(c => c.id === id);
     if (!current) throw new Error('Contact not found');
     const updated = { ...current, ...contactData };
-    return MockStorageServer.saveContact(updated);
+    return CrmStorage.saveContact(updated);
   },
 
   async deleteContact(id: string): Promise<void> {
     await delay();
-    MockStorageServer.deleteContact(id);
+    CrmStorage.deleteContact(id);
   },
 
   async getCompanies(): Promise<Company[]> {
     await delay();
-    return MockStorageServer.getCompanies();
+    return CrmStorage.getCompanies();
   },
 
   async createCompany(companyData: Omit<Company, 'id' | 'createdAt' | 'openDealsCount' | 'totalRevenue'>): Promise<Company> {
@@ -301,116 +335,244 @@ export const crmService = {
       openDealsCount: 0,
       createdAt: new Date().toISOString(),
     };
-    return MockStorageServer.saveCompany(newCompany);
+    return CrmStorage.saveCompany(newCompany);
   },
 
   async updateCompany(id: string, data: Partial<Company>): Promise<Company> {
     await delay();
-    const list = MockStorageServer.getCompanies();
+    const list = CrmStorage.getCompanies();
     const current = list.find(c => c.id === id);
     if (!current) throw new Error('Company not found');
     const updated = { ...current, ...data };
-    return MockStorageServer.saveCompany(updated);
+    return CrmStorage.saveCompany(updated);
   },
 
   async deleteCompany(id: string): Promise<void> {
     await delay();
-    MockStorageServer.deleteCompany(id);
+    CrmStorage.deleteCompany(id);
   },
 
   // === QUOTATIONS ===
   async getQuotations(): Promise<Quotation[]> {
     await delay();
-    return MockStorageServer.getQuotations();
+    return CrmStorage.getQuotations();
   },
 
   async createQuotation(data: Omit<Quotation, 'id' | 'createdAt' | 'quoteNumber'>): Promise<Quotation> {
     await delay();
-    const quotes = MockStorageServer.getQuotations();
-    const quoteNumber = `Q-2026-${String(quotes.length + 90).padStart(3, '0')}`;
+    const quotes = CrmStorage.getQuotations();
+    const currentUser = CrmStorage.getUser();
+    const quoteNumber = `Q-${new Date().getFullYear()}-${String(quotes.length + 1).padStart(3, '0')}`;
     const newQuote: Quotation = {
       ...data,
       id: `quot_${Date.now()}`,
       quoteNumber,
+      createdBy: data.createdBy || currentUser?.name || 'User',
       createdAt: new Date().toISOString(),
     };
-    return MockStorageServer.saveQuotation(newQuote);
+    return CrmStorage.saveQuotation(newQuote);
   },
 
   async updateQuotationStatus(id: string, status: QuotationStatus): Promise<Quotation> {
     await delay();
-    const quotes = MockStorageServer.getQuotations();
+    const quotes = CrmStorage.getQuotations();
     const quote = quotes.find(q => q.id === id);
     if (!quote) throw new Error('Quotation not found');
     quote.status = status;
-    return MockStorageServer.saveQuotation(quote);
+    return CrmStorage.saveQuotation(quote);
   },
 
   async deleteQuotation(id: string): Promise<void> {
     await delay();
-    MockStorageServer.deleteQuotation(id);
+    CrmStorage.deleteQuotation(id);
   },
 
   // === TASKS ===
   async getTasks(): Promise<Task[]> {
     await delay();
-    return MockStorageServer.getTasks();
+    return CrmStorage.getTasks();
   },
 
   async createTask(taskData: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
     await delay();
+    const currentUser = CrmStorage.getUser();
     const newTask: Task = {
       ...taskData,
       id: `task_${Date.now()}`,
+      assignedTo: taskData.assignedTo || currentUser?.id || '',
       createdAt: new Date().toISOString(),
     };
-    return MockStorageServer.saveTask(newTask);
+    return CrmStorage.saveTask(newTask);
   },
 
   async toggleTaskStatus(id: string): Promise<Task> {
-    await delay(100);
-    const task = MockStorageServer.toggleTask(id);
+    await delay(60);
+    const task = CrmStorage.toggleTask(id);
     if (!task) throw new Error('Task not found');
     return task;
   },
 
   async deleteTask(id: string): Promise<void> {
     await delay();
-    MockStorageServer.deleteTask(id);
+    CrmStorage.deleteTask(id);
   },
 
   // === ACTIVITIES ===
   async getActivities(): Promise<Activity[]> {
     await delay();
-    return MockStorageServer.getActivities();
+    return CrmStorage.getActivities();
   },
 
   async createActivity(activityData: Omit<Activity, 'id' | 'timestamp' | 'performedBy' | 'performedById'>): Promise<Activity> {
     await delay();
-    const user = MockStorageServer.getUser();
+    const user = CrmStorage.getUser();
     const newActivity: Activity = {
       ...activityData,
       id: `act_${Date.now()}`,
-      performedBy: user.name,
-      performedById: user.id,
+      performedBy: user?.name || 'User',
+      performedById: user?.id || '',
       timestamp: new Date().toISOString(),
     };
-    return MockStorageServer.addActivity(newActivity);
+    return CrmStorage.addActivity(newActivity);
   },
 
   // === SETTINGS & SYSTEM ===
   async getSettings(): Promise<WorkspaceSettings> {
-    await delay(100);
-    return MockStorageServer.getSettings();
+    await delay(50);
+    return CrmStorage.getSettings();
   },
 
   async updateSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings> {
-    await delay(150);
-    return MockStorageServer.saveSettings(settings);
+    await delay(80);
+    return CrmStorage.saveSettings(settings);
   },
 
-  async resetData(): Promise<void> {
-    await delay(200);
-    MockStorageServer.resetAll();
+  async clearAllData(): Promise<void> {
+    await delay(100);
+    CrmStorage.clearAll();
+  },
+
+  // === OPERATIONS: INSTALLATIONS ===
+  async getInstallations(): Promise<Installation[]> {
+    await delay(60);
+    return CrmStorage.getInstallations();
+  },
+
+  async createInstallation(data: Omit<Installation, 'id' | 'createdAt' | 'updatedAt'>): Promise<Installation> {
+    await delay(80);
+    const now = new Date().toISOString();
+    const newInst: Installation = {
+      ...data,
+      id: `inst_${Date.now()}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    CrmStorage.saveInstallation(newInst);
+
+    const currentUser = CrmStorage.getUser();
+    CrmStorage.addActivity({
+      id: `act_${Date.now()}`,
+      type: 'note',
+      title: `Installation Scheduled for ${newInst.customerName}`,
+      description: `Assigned to installer ${newInst.installer} on ${newInst.installationDate}. Status: ${newInst.status}.`,
+      performedBy: currentUser?.name || 'User',
+      performedById: currentUser?.id || '',
+      timestamp: now,
+      relatedToType: newInst.dealId ? 'deal' : newInst.customerId ? 'contact' : undefined,
+      relatedToId: newInst.dealId || newInst.customerId,
+      relatedToName: newInst.dealTitle || newInst.customerName,
+    });
+
+    return newInst;
+  },
+
+  async updateInstallation(id: string, data: Partial<Installation>): Promise<Installation> {
+    await delay(80);
+    const list = CrmStorage.getInstallations();
+    const existing = list.find(i => i.id === id);
+    if (!existing) throw new Error('Installation not found');
+    const updated: Installation = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    return CrmStorage.saveInstallation(updated);
+  },
+
+  async deleteInstallation(id: string): Promise<void> {
+    await delay(60);
+    CrmStorage.deleteInstallation(id);
+  },
+
+  // === OPERATIONS: INSTALLER SCHEDULES ===
+  async getInstallerSchedules(): Promise<InstallerScheduleItem[]> {
+    await delay(60);
+    return CrmStorage.getInstallerSchedules();
+  },
+
+  async createInstallerSchedule(data: Omit<InstallerScheduleItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<InstallerScheduleItem> {
+    await delay(80);
+    const now = new Date().toISOString();
+    const newSchedule: InstallerScheduleItem = {
+      ...data,
+      id: `sch_${Date.now()}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    CrmStorage.saveInstallerSchedule(newSchedule);
+    return newSchedule;
+  },
+
+  async updateInstallerSchedule(id: string, data: Partial<InstallerScheduleItem>): Promise<InstallerScheduleItem> {
+    await delay(80);
+    const list = CrmStorage.getInstallerSchedules();
+    const existing = list.find(s => s.id === id);
+    if (!existing) throw new Error('Installer schedule not found');
+    const updated: InstallerScheduleItem = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    return CrmStorage.saveInstallerSchedule(updated);
+  },
+
+  async deleteInstallerSchedule(id: string): Promise<void> {
+    await delay(60);
+    CrmStorage.deleteInstallerSchedule(id);
+  },
+
+  // === OPERATIONS: DEVICE INVENTORY ===
+  async getDeviceInventory(): Promise<DeviceInventoryItem[]> {
+    await delay(60);
+    return CrmStorage.getDeviceInventory();
+  },
+
+  async createDeviceInventoryItem(data: Omit<DeviceInventoryItem, 'id' | 'updatedAt'>): Promise<DeviceInventoryItem> {
+    await delay(80);
+    const newItem: DeviceInventoryItem = {
+      ...data,
+      id: `dev_${Date.now()}`,
+      updatedAt: new Date().toISOString().split('T')[0],
+    };
+    CrmStorage.saveDeviceInventory(newItem);
+    return newItem;
+  },
+
+  async updateDeviceInventoryItem(id: string, data: Partial<DeviceInventoryItem>): Promise<DeviceInventoryItem> {
+    await delay(80);
+    const list = CrmStorage.getDeviceInventory();
+    const existing = list.find(d => d.id === id);
+    if (!existing) throw new Error('Device not found');
+    const updated: DeviceInventoryItem = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString().split('T')[0],
+    };
+    return CrmStorage.saveDeviceInventory(updated);
+  },
+
+  async deleteDeviceInventoryItem(id: string): Promise<void> {
+    await delay(60);
+    CrmStorage.deleteDeviceInventory(id);
   }
 };

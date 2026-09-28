@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types/crm';
 import { crmService } from '../api/services/crmService';
-import { MockStorageServer } from '../api/mockServer';
+import { CrmStorage } from '../api/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -21,12 +21,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const token = MockStorageServer.getToken();
+        const token = CrmStorage.getToken();
         if (token) {
           const currentUser = await crmService.getCurrentUser();
           setUser(currentUser);
         } else {
-          setUser(null);
+          const currentUser = await crmService.getCurrentUser();
+          setUser(currentUser);
         }
       } catch (err) {
         console.error('Failed to load user session:', err);

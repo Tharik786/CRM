@@ -14,9 +14,7 @@ The application is running locally at:
 - **Core Framework**: React 19 + TypeScript (ES2023, strict mode enabled)
 - **Bundler & Build Tool**: Vite 8 with HMR (Hot Module Replacement)
 - **Routing**: React Router DOM (Declarative client-side routing, protected session layout)
-- **Styling**: Tailwind CSS v3.4 with custom typography, brand palette, and glassmorphic elevations
-- **API Client**: Axios configured with authentication interceptors & LocalStorage-backed Mock REST API adapter
-- **Iconography**: Lucide React
+- **API Client**: Axios configured with authentication interceptors & persistent client storage adapter
 
 ---
 
@@ -86,8 +84,7 @@ CRM/
 │   │   └── crm.ts               # Comprehensive TypeScript definitions
 │   ├── api/
 │   │   ├── axiosClient.ts       # Axios instance with interceptors
-│   │   ├── mockData.ts          # Seed enterprise datasets
-│   │   ├── mockServer.ts        # LocalStorage persistence & CRUD engine
+│   │   ├── storage.ts           # Clean LocalStorage persistence engine
 │   │   └── services/
 │   │       └── crmService.ts    # Typed asynchronous service methods
 │   ├── context/

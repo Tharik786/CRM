@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCrm } from '../../context/CrmContext';
-import { Lead, LeadStatus } from '../../types/crm';
+import { Lead, LeadStatus, LeadSource } from '../../types/crm';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Table, Column, Pagination } from '../../components/common/Table';
@@ -13,7 +13,6 @@ import {
   Edit2,
   Trash2,
   Download,
-  Flame,
   Mail,
   Phone,
   Building2,
@@ -27,7 +26,7 @@ export const LeadsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'score' | 'value' | 'date'>('score');
+  const [sortBy, setSortBy] = useState<'value' | 'date'>('date');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,7 +49,6 @@ export const LeadsPage: React.FC = () => {
         return matchesSearch && matchesStatus && matchesSource;
       })
       .sort((a, b) => {
-        if (sortBy === 'score') return b.score - a.score;
         if (sortBy === 'value') return b.estimatedValue - a.estimatedValue;
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
@@ -80,7 +78,7 @@ export const LeadsPage: React.FC = () => {
   };
 
   const handleConvert = async (lead: Lead) => {
-    if (window.confirm(`Convert ${lead.name} (${lead.company}) into an active Deal and Contact?`)) {
+    if (window.confirm(`Convert ${lead.name} (${lead.company}) into a Client?`)) {
       await convertLead(lead.id);
     }
   };
@@ -103,12 +101,28 @@ export const LeadsPage: React.FC = () => {
     );
   };
 
-  const statusVariantMap: Record<LeadStatus, 'slate' | 'indigo' | 'green' | 'rose' | 'purple'> = {
-    new: 'indigo',
+  const statusVariantMap: Record<LeadStatus, 'slate' | 'indigo' | 'green' | 'rose' | 'purple' | 'blue' | 'amber'> = {
+    new: 'blue',
+    qualified: 'indigo',
+    proposal: 'amber',
+    discussion: 'purple',
+    won: 'green',
+    lost: 'rose',
     contacted: 'slate',
-    qualified: 'green',
     unqualified: 'rose',
-    converted: 'purple',
+    converted: 'green',
+  };
+
+  const statusLabelMap: Record<LeadStatus, string> = {
+    new: 'New',
+    qualified: 'Qualified',
+    proposal: 'Proposal',
+    discussion: 'Discussion',
+    won: 'Won',
+    lost: 'Lost',
+    contacted: 'Contacted',
+    unqualified: 'Unqualified',
+    converted: 'Client',
   };
 
   const columns: Column<Lead>[] = [
@@ -150,25 +164,7 @@ export const LeadsPage: React.FC = () => {
         </div>
       ),
     },
-    {
-      key: 'score',
-      header: 'Score',
-      render: lead => {
-        const isHigh = lead.score >= 80;
-        return (
-          <div className="flex items-center gap-1.5">
-            {isHigh && <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
-            <span
-              className={`font-mono font-bold text-xs ${
-                isHigh ? 'text-amber-600' : lead.score >= 60 ? 'text-indigo-600' : 'text-slate-500'
-              }`}
-            >
-              {lead.score}/100
-            </span>
-          </div>
-        );
-      },
-    },
+
     {
       key: 'estimatedValue',
       header: 'Est. Value',
@@ -182,19 +178,29 @@ export const LeadsPage: React.FC = () => {
       key: 'status',
       header: 'Status',
       render: lead => (
-        <Badge variant={statusVariantMap[lead.status]} size="sm">
-          {lead.status}
+        <Badge variant={statusVariantMap[lead.status] || 'slate'} size="sm">
+          {statusLabelMap[lead.status] || lead.status}
         </Badge>
       ),
     },
     {
       key: 'source',
       header: 'Source',
-      render: lead => (
-        <span className="text-xs text-slate-500 capitalize">
-          {lead.source.replace('_', ' ')}
-        </span>
-      ),
+      render: lead => {
+        const sourceLabelMap: Record<LeadSource, string> = {
+          website: 'Website Inbound',
+          inbound_call: 'Phone Inbound',
+          linkedin: 'LinkedIn',
+          referral: 'Referral',
+          event: 'Conference',
+          cold_outreach: 'Cold Outreach',
+        };
+        return (
+          <span className="text-xs text-slate-600 font-medium">
+            {sourceLabelMap[lead.source] || lead.source}
+          </span>
+        );
+      },
     },
     {
       key: 'actions',
@@ -210,15 +216,15 @@ export const LeadsPage: React.FC = () => {
                 e.stopPropagation();
                 handleConvert(lead);
               }}
-              title="Convert to Deal & Client"
+              title="Convert to Client"
               className="text-brand-600 border-brand-200 hover:bg-brand-50"
               icon={<ArrowRightLeft className="w-3 h-3" />}
             >
-              Convert
+              Client
             </Button>
           ) : (
-            <span className="text-[11px] text-purple-600 font-semibold flex items-center gap-1 px-2 py-0.5 bg-purple-50 rounded">
-              <CheckCircle className="w-3 h-3" /> Converted
+            <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 px-2 py-0.5 bg-emerald-50 rounded">
+              <CheckCircle className="w-3 h-3" /> Client
             </span>
           )}
 
@@ -309,11 +315,12 @@ export const LeadsPage: React.FC = () => {
             className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           >
             <option value="all">All Statuses</option>
-            <option value="new">New</option>
-            <option value="contacted">Contacted</option>
-            <option value="qualified">Qualified</option>
-            <option value="unqualified">Unqualified</option>
-            <option value="converted">Converted</option>
+            <option value="new">1. New</option>
+            <option value="qualified">2. Qualified</option>
+            <option value="proposal">3. Proposal</option>
+            <option value="discussion">4. Discussion</option>
+            <option value="won">5. Won</option>
+            <option value="lost">6. Lost</option>
           </select>
 
           <select
@@ -334,12 +341,11 @@ export const LeadsPage: React.FC = () => {
 
           <select
             value={sortBy}
-            onChange={e => setSortBy(e.target.value as 'score' | 'value' | 'date')}
+            onChange={e => setSortBy(e.target.value as 'value' | 'date')}
             className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           >
-            <option value="score">Sort by Intent Score</option>
-            <option value="value">Sort by Est. Value</option>
             <option value="date">Sort by Recent</option>
+            <option value="value">Sort by Est. Value</option>
           </select>
         </div>
       </div>

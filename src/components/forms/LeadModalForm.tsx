@@ -99,7 +99,7 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? 'Edit Enquiry' : 'Create New Enquiry'}
-      subtitle="Capture customer enquiry and set pipeline score"
+      subtitle="Capture customer enquiry and details"
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -142,33 +142,33 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select
-            label="Lead Acquisition Channel"
+            label="Sources"
             value={source}
             onChange={e => setSource(e.target.value as LeadSource)}
             options={[
               { value: 'website', label: 'Website Inbound' },
-              { value: 'inbound_call', label: 'Inbound Phone' },
-              { value: 'linkedin', label: 'LinkedIn Outreach' },
-              { value: 'referral', label: 'Customer Referral' },
-              { value: 'event', label: 'Industry Conference / Event' },
-              { value: 'cold_outreach', label: 'Direct Cold Outreach' },
+              { value: 'inbound_call', label: 'Phone Inbound' },
+              { value: 'linkedin', label: 'LinkedIn' },
+              { value: 'referral', label: 'Referral' },
+              { value: 'event', label: 'Conference' },
             ]}
           />
           <Select
-            label="Qualification Status"
+            label="Status"
             value={status}
             onChange={e => setStatus(e.target.value as LeadStatus)}
             options={[
-              { value: 'new', label: 'New / Uncontacted' },
-              { value: 'contacted', label: 'Contacted' },
-              { value: 'qualified', label: 'Qualified' },
-              { value: 'unqualified', label: 'Unqualified' },
-              { value: 'converted', label: 'Converted' },
+              { value: 'new', label: '1. New' },
+              { value: 'qualified', label: '2. Qualified' },
+              { value: 'proposal', label: '3. Proposal' },
+              { value: 'discussion', label: '4. Discussion' },
+              { value: 'won', label: '5. Won' },
+              { value: 'lost', label: '6. Lost' },
             ]}
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
           <Input
             label="Estimated Deal Value ($)"
             type="number"
@@ -177,30 +177,6 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
             value={estimatedValue}
             onChange={e => setEstimatedValue(Number(e.target.value))}
             error={errors.estimatedValue}
-          />
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Fit & Intent Score: <span className="text-brand-600 font-bold">{score}/100</span>
-            </label>
-            <input
-              type="range"
-              min="10"
-              max="100"
-              value={score}
-              onChange={e => setScore(Number(e.target.value))}
-              className="w-full accent-brand-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">Enquiry Notes / Requirements</label>
-          <textarea
-            rows={3}
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Add background context, budget expectations, pain points..."
-            className="w-full rounded-lg border border-slate-300 text-sm p-3 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
         </div>
 

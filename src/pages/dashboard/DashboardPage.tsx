@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useCrm } from '../../context/CrmContext';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardHeader, CardBody } from '../../components/common/Card';
@@ -18,46 +19,124 @@ import {
   PhoneCall,
   Mail,
   Users2,
+  CalendarCheck,
+  Cpu,
+  Users,
+  AlertCircle,
+  Truck,
 } from 'lucide-react';
 import { DashboardMetrics } from '../../types/crm';
 import { crmService } from '../../api/services/crmService';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const { tasks, toggleTask } = useCrm();
+  const {
+    tasks = [],
+    toggleTask,
+    installations = [],
+    installerSchedules = [],
+    deviceInventory = [],
+  } = useCrm();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const overviewMetrics = useMemo(() => {
+    const validInsts = (installations || []).filter(Boolean);
+    const validSchedules = (installerSchedules || []).filter(Boolean);
+    const validDevices = (deviceInventory || []).filter(Boolean);
+
+    // 1. Today's Installations
+    const todayInsts = validInsts.filter(i => (i.installationDate || '') === todayStr);
+    const todayCompleted = todayInsts.filter(i => i.status === 'completed').length;
+    const todayRemaining = Math.max(0, todayInsts.length - todayCompleted);
+
+    // 2. Pending Jobs (installations scheduled or pending)
+    const pendingJobs = validInsts.filter(
+      i => i.status === 'pending' || i.status === 'scheduled'
+    ).length;
+
+    // 3. Available Devices
+    const totalAvailableDevices = validDevices.reduce(
+      (acc, curr) => acc + (curr.availableQty || 0),
+      0
+    );
+    const totalAllocatedDevices = validDevices.reduce(
+      (acc, curr) => acc + (curr.allocatedQty || 0),
+      0
+    );
+
+    // 4. Active Installers
+    const activeInstallerSet = new Set<string>();
+    validInsts.forEach(i => {
+      if (i.status === 'in_progress' || i.status === 'scheduled') {
+        if (i.installer) activeInstallerSet.add(i.installer);
+      }
+    });
+    validSchedules.forEach(s => {
+      if ((s.visitDate || '') === todayStr && s.installer) {
+        activeInstallerSet.add(s.installer);
+      }
+    });
+    const activeInstallersCount = activeInstallerSet.size;
+
+    return {
+      todayCount: todayInsts.length,
+      todayCompleted,
+      todayRemaining,
+      pendingJobs,
+      totalAvailableDevices,
+      totalAllocatedDevices,
+      activeInstallersCount,
+    };
+  }, [installations, installerSchedules, deviceInventory, todayStr]);
+
   useEffect(() => {
+    let isMounted = true;
     const fetchMetrics = async () => {
       try {
         const data = await crmService.getDashboardMetrics();
-        setMetrics(data);
+        if (isMounted) setMetrics(data);
       } catch (err) {
         console.error('Failed to load metrics:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     fetchMetrics();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="h-96 flex items-center justify-center">
-        <LoadingSpinner label="Calculating real-time CRM metrics..." />
-      </div>
-    );
-  }
+  const fallbackMetrics: DashboardMetrics = {
+    totalRevenue: 0,
+    revenueChange: 0,
+    dealsWonCount: 0,
+    dealsWonChange: 0,
+    activeLeadsCount: 0,
+    leadsChange: 0,
+    winRate: 0,
+    winRateChange: 0,
+    pipelineValue: 0,
+    stageBreakdown: [
+      { stage: 'qualification', count: 0, totalValue: 0 },
+      { stage: 'needs_analysis', count: 0, totalValue: 0 },
+      { stage: 'proposal_sent', count: 0, totalValue: 0 },
+      { stage: 'negotiation', count: 0, totalValue: 0 },
+      { stage: 'closed_won', count: 0, totalValue: 0 },
+      { stage: 'closed_lost', count: 0, totalValue: 0 },
+    ],
+    recentActivities: [],
+    upcomingTasks: [],
+  };
 
-  if (!metrics) {
-    return null;
-  }
-
-  const todayTasks = tasks.slice(0, 5);
-  const activeDealsCount = metrics.stageBreakdown
-    .filter(s => s.stage !== 'closed_won' && s.stage !== 'closed_lost')
-    .reduce((acc, curr) => acc + curr.count, 0);
+  const activeMetrics = metrics || fallbackMetrics;
+  const todayTasks = (tasks || []).slice(0, 5);
+  const activeDealsCount = (activeMetrics.stageBreakdown || [])
+    .filter(s => s && s.stage !== 'closed_won' && s.stage !== 'closed_lost')
+    .reduce((acc, curr) => acc + (curr?.count || 0), 0);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -69,6 +148,14 @@ export const DashboardPage: React.FC = () => {
       return 'Good evening';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <LoadingSpinner label="Calculating real-time CRM metrics..." />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 animate-fade-in pb-12">
@@ -97,11 +184,11 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {formatCurrency(metrics.totalRevenue)}
+                {formatCurrency(activeMetrics.totalRevenue)}
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs">
                 <span className="inline-flex items-center text-emerald-600 font-semibold">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> {metrics.dealsWonCount} deals won
+                  <ArrowUpRight className="w-3.5 h-3.5" /> {activeMetrics.dealsWonCount} deals won
                 </span>
               </div>
             </div>
@@ -121,7 +208,7 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {formatCurrency(metrics.pipelineValue)}
+                {formatCurrency(activeMetrics.pipelineValue)}
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs">
                 <span className="inline-flex items-center text-brand-600 font-semibold">
@@ -146,11 +233,11 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {metrics.winRate}%
+                {activeMetrics.winRate}%
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs">
                 <span className="inline-flex items-center text-emerald-600 font-semibold">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> +{metrics.winRateChange}%
+                  <ArrowUpRight className="w-3.5 h-3.5" /> +{activeMetrics.winRateChange}%
                 </span>
                 <span className="text-slate-400">conversion benchmark</span>
               </div>
@@ -171,11 +258,11 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {metrics.activeLeadsCount} Enquiries
+                {activeMetrics.activeLeadsCount} Enquiries
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs">
                 <span className="inline-flex items-center text-emerald-600 font-semibold">
-                  +{metrics.leadsChange}%
+                  +{activeMetrics.leadsChange}%
                 </span>
                 <span className="text-slate-400">inbound growth</span>
               </div>
@@ -184,64 +271,16 @@ export const DashboardPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Pipeline Summary Breakdown */}
-      <Card>
-        <CardHeader
-          title="Sales Pipeline Summary"
-        />
-        <CardBody>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {metrics.stageBreakdown.map((item, idx) => {
-              const stageLabels: Record<string, string> = {
-                qualification: 'New',
-                needs_analysis: 'Qualified',
-                proposal_sent: 'Proposal',
-                negotiation: 'Discussion',
-                closed_won: 'Won',
-                closed_lost: 'Lost',
-              };
-
-              const colors = [
-                'border-blue-200 bg-blue-50/50 text-blue-700',
-                'border-indigo-200 bg-indigo-50/50 text-indigo-700',
-                'border-amber-200 bg-amber-50/50 text-amber-700',
-                'border-purple-200 bg-purple-50/50 text-purple-700',
-                'border-emerald-200 bg-emerald-50/50 text-emerald-700',
-                'border-rose-200 bg-rose-50/50 text-rose-700',
-              ];
-
-              return (
-                <div
-                  key={item.stage}
-                  className={`p-3.5 rounded-xl border ${colors[idx % colors.length]} flex flex-col justify-between`}
-                >
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider block opacity-80">
-                      {stageLabels[item.stage]}
-                    </span>
-                    <div className="text-lg font-black font-mono mt-1">
-                      {formatCurrency(item.totalValue)}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs font-medium opacity-75">
-                    {item.count} {item.count === 1 ? 'deal' : 'deals'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Main Grid: Today's Tasks & Follow-ups vs Recent Activities */}
+      {/* Today's Tasks & Follow-ups vs Recent Activities */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Tasks / Reminders */}
-        <Card>
+        <Card className="flex flex-col h-[280px]">
           <CardHeader
+            className="shrink-0"
             title="Today's Priority Follow-ups"
             subtitle="Scheduled customer calls, quote reviews, and action items"
           />
-          <CardBody className="p-0">
+          <CardBody className="p-0 flex-1 min-h-0 overflow-y-auto">
             <div className="divide-y divide-slate-100">
               {todayTasks.map(task => {
                 const isCompleted = task.status === 'completed';
@@ -306,7 +345,7 @@ export const DashboardPage: React.FC = () => {
               })}
 
               {todayTasks.length === 0 && (
-                <div className="p-8 text-center text-xs text-slate-400">
+                <div className="h-36 flex items-center justify-center p-6 text-center text-xs text-slate-400">
                   No pending follow-ups scheduled for today!
                 </div>
               )}
@@ -315,14 +354,15 @@ export const DashboardPage: React.FC = () => {
         </Card>
 
         {/* Recent Activity Timeline */}
-        <Card>
+        <Card className="flex flex-col h-[280px]">
           <CardHeader
+            className="shrink-0"
             title="Activity Timeline"
             subtitle="Recent calls, quotations, closed sales, and notes"
           />
-          <CardBody className="p-0">
+          <CardBody className="p-0 flex-1 min-h-0 overflow-y-auto">
             <div className="divide-y divide-slate-100">
-              {metrics.recentActivities.map(act => {
+              {(activeMetrics.recentActivities || []).map(act => {
                 const iconMap: Record<string, React.ReactNode> = {
                   call: <PhoneCall className="w-3.5 h-3.5 text-blue-600" />,
                   meeting: <Users2 className="w-3.5 h-3.5 text-indigo-600" />,
@@ -354,9 +394,187 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 );
               })}
+              {(activeMetrics.recentActivities || []).length === 0 && (
+                <div className="h-36 flex items-center justify-center p-6 text-center text-xs text-slate-400">
+                  No recent activities recorded yet.
+                </div>
+              )}
             </div>
           </CardBody>
         </Card>
+      </div>
+
+      {/* Pipeline Summary Breakdown */}
+      <Card>
+        <CardHeader
+          title="Sales Pipeline Summary"
+        />
+        <CardBody>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {(activeMetrics.stageBreakdown || []).map((item, idx) => {
+              const stageLabels: Record<string, string> = {
+                qualification: 'New',
+                needs_analysis: 'Qualified',
+                proposal_sent: 'Proposal',
+                negotiation: 'Discussion',
+                closed_won: 'Won',
+                closed_lost: 'Lost',
+              };
+
+              const colors = [
+                'border-blue-200 bg-blue-50/50 text-blue-700',
+                'border-indigo-200 bg-indigo-50/50 text-indigo-700',
+                'border-amber-200 bg-amber-50/50 text-amber-700',
+                'border-purple-200 bg-purple-50/50 text-purple-700',
+                'border-emerald-200 bg-emerald-50/50 text-emerald-700',
+                'border-rose-200 bg-rose-50/50 text-rose-700',
+              ];
+
+              return (
+                <div
+                  key={item.stage}
+                  className={`p-3.5 rounded-xl border ${colors[idx % colors.length]} flex flex-col justify-between`}
+                >
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider block opacity-80">
+                      {stageLabels[item.stage]}
+                    </span>
+                    <div className="text-lg font-black font-mono mt-1">
+                      {formatCurrency(item.totalValue)}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs font-medium opacity-75">
+                    {item.count} {item.count === 1 ? 'deal' : 'deals'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Operations Overview Section */}
+      <div className="space-y-4 pt-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              Operations Overview
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Live snapshot of field installations, dispatch queues, and hardware inventory
+            </p>
+          </div>
+          <Link
+            to="/operations"
+            className="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline flex items-center gap-1"
+          >
+            Manage Operations &rarr;
+          </Link>
+        </div>
+
+        {/* Overview Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {/* Today's Installations */}
+          <Card className="hover:border-brand-200 transition-all">
+            <CardBody className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Today's Installations
+                </span>
+                <div className="h-9 w-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <CalendarCheck className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {overviewMetrics.todayCount}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="text-emerald-600 font-semibold inline-flex items-center gap-0.5">
+                    <CheckCircle2 className="w-3 h-3" /> {overviewMetrics.todayCompleted} done
+                  </span>
+                  <span>•</span>
+                  <span className="text-slate-500 font-medium">
+                    {overviewMetrics.todayRemaining} remaining
+                  </span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Pending Jobs */}
+          <Card className="hover:border-brand-200 transition-all">
+            <CardBody className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Pending Jobs
+                </span>
+                <div className="h-9 w-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Clock className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {overviewMetrics.pendingJobs}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs">
+                  <span className="inline-flex items-center text-amber-600 font-medium">
+                    <AlertCircle className="w-3 h-3 mr-1" /> Awaiting dispatch & site prep
+                  </span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Available Devices */}
+          <Card className="hover:border-brand-200 transition-all">
+            <CardBody className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Available Devices
+                </span>
+                <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Cpu className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {overviewMetrics.totalAvailableDevices}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="text-brand-600 font-semibold">
+                    {overviewMetrics.totalAllocatedDevices} allocated
+                  </span>
+                  <span>in field deployments</span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Active Installers */}
+          <Card className="hover:border-brand-200 transition-all">
+            <CardBody className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Active Installers
+                </span>
+                <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Users className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {overviewMetrics.activeInstallersCount}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="text-indigo-600 font-semibold inline-flex items-center gap-1">
+                    <Truck className="w-3 h-3" /> Field crew on duty
+                  </span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
       </div>
     </div>
   );

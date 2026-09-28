@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Contact } from '../../types/crm';
 import { Modal } from '../common/Modal';
-import { Input, Select } from '../common/Input';
+import { Input } from '../common/Input';
 import { Button } from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
 
@@ -24,7 +24,6 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [lifecycleStage, setLifecycleStage] = useState<Contact['lifecycleStage']>('lead');
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +35,6 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
       setCompanyName(initialData.companyName);
       setEmail(initialData.email);
       setPhone(initialData.phone);
-      setLifecycleStage(initialData.lifecycleStage);
       setNotes(initialData.notes || '');
     } else {
       setName('');
@@ -44,7 +42,6 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
       setCompanyName('');
       setEmail('');
       setPhone('');
-      setLifecycleStage('lead');
       setNotes('');
     }
     setErrors({});
@@ -75,7 +72,7 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
         companyName,
         email,
         phone,
-        lifecycleStage,
+        lifecycleStage: initialData?.lifecycleStage || 'customer',
         assignedTo: initialData?.assignedTo || user?.id || 'usr_current',
         notes,
       });
@@ -137,19 +134,6 @@ export const ContactModalForm: React.FC<ContactModalFormProps> = ({
             onChange={e => setPhone(e.target.value)}
           />
         </div>
-
-        <Select
-          label="Customer Lifecycle Stage"
-          value={lifecycleStage}
-          onChange={e => setLifecycleStage(e.target.value as Contact['lifecycleStage'])}
-          options={[
-            { value: 'subscriber', label: 'Subscriber' },
-            { value: 'lead', label: 'Lead' },
-            { value: 'mql', label: 'Marketing Qualified Lead (MQL)' },
-            { value: 'customer', label: 'Active Customer' },
-            { value: 'evangelist', label: 'Advocate / Evangelist' },
-          ]}
-        />
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5">Relationship Notes</label>

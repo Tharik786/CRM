@@ -29,9 +29,6 @@ import {
   Trash2,
   MapPin,
   Briefcase,
-  CheckCircle2,
-  AlertCircle,
-  Truck,
   Box,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -87,54 +84,6 @@ export const OperationsPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // ==========================================
-  // Overview Cards Metrics
-  // ==========================================
-  const overviewMetrics = useMemo(() => {
-    // 1. Today's Installations
-    const todayInsts = installations.filter(i => i.installationDate === todayStr);
-    const todayCompleted = todayInsts.filter(i => i.status === 'completed').length;
-    const todayRemaining = todayInsts.length - todayCompleted;
-
-    // 2. Pending Jobs (installations scheduled or pending)
-    const pendingJobs = installations.filter(
-      i => i.status === 'pending' || i.status === 'scheduled'
-    ).length;
-
-    // 3. Available Devices
-    const totalAvailableDevices = deviceInventory.reduce(
-      (acc, curr) => acc + (curr.availableQty || 0),
-      0
-    );
-    const totalAllocatedDevices = deviceInventory.reduce(
-      (acc, curr) => acc + (curr.allocatedQty || 0),
-      0
-    );
-
-    // 4. Active Installers
-    const activeInstallerSet = new Set<string>();
-    installations.forEach(i => {
-      if (i.status === 'in_progress' || i.status === 'scheduled') {
-        if (i.installer) activeInstallerSet.add(i.installer);
-      }
-    });
-    installerSchedules.forEach(s => {
-      if (s.visitDate === todayStr && s.installer) {
-        activeInstallerSet.add(s.installer);
-      }
-    });
-    const activeInstallersCount = activeInstallerSet.size;
-
-    return {
-      todayCount: todayInsts.length,
-      todayCompleted,
-      todayRemaining,
-      pendingJobs,
-      totalAvailableDevices,
-      totalAllocatedDevices,
-      activeInstallersCount,
-    };
-  }, [installations, installerSchedules, deviceInventory, todayStr]);
 
   // ==========================================
   // Filtered & Sorted Data: Installations
@@ -749,109 +698,6 @@ export const OperationsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Today's Installations */}
-        <Card className="hover:border-brand-200 transition-all">
-          <CardBody className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Today's Installations
-              </span>
-              <div className="h-9 w-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                <CalendarCheck className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {overviewMetrics.todayCount}
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                <span className="text-emerald-600 font-semibold inline-flex items-center gap-0.5">
-                  <CheckCircle2 className="w-3 h-3" /> {overviewMetrics.todayCompleted} done
-                </span>
-                <span>•</span>
-                <span className="text-slate-500 font-medium">
-                  {overviewMetrics.todayRemaining} remaining
-                </span>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        {/* Pending Jobs */}
-        <Card className="hover:border-brand-200 transition-all">
-          <CardBody className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Pending Jobs
-              </span>
-              <div className="h-9 w-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Clock className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {overviewMetrics.pendingJobs}
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-xs">
-                <span className="inline-flex items-center text-amber-600 font-medium">
-                  <AlertCircle className="w-3 h-3 mr-1" /> Awaiting dispatch & site prep
-                </span>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        {/* Available Devices */}
-        <Card className="hover:border-brand-200 transition-all">
-          <CardBody className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Available Devices
-              </span>
-              <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Cpu className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {overviewMetrics.totalAvailableDevices}
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                <span className="text-brand-600 font-semibold">
-                  {overviewMetrics.totalAllocatedDevices} allocated
-                </span>
-                <span>in field deployments</span>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        {/* Active Installers */}
-        <Card className="hover:border-brand-200 transition-all">
-          <CardBody className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Active Installers
-              </span>
-              <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <Users className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                {overviewMetrics.activeInstallersCount}
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                <span className="text-indigo-600 font-semibold inline-flex items-center gap-1">
-                  <Truck className="w-3 h-3" /> Field crew on duty
-                </span>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200">

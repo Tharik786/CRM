@@ -190,27 +190,6 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Closing Probability: <span className="text-brand-600 font-bold">{probability}%</span>
-          </label>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="5"
-            value={probability}
-            onChange={e => setProbability(Number(e.target.value))}
-            className="w-full accent-brand-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-          />
-        </div>
-
-        <Input
-          label="Tags (comma-separated)"
-          placeholder="e.g. Tier-1, AI, Renewal"
-          value={tagsInput}
-          onChange={e => setTagsInput(e.target.value)}
-        />
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>

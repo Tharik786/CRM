@@ -222,13 +222,7 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Input
-            label="Linked Deal (Optional)"
-            placeholder="e.g. Enterprise AI Suite Expansion"
-            value={dealTitle}
-            onChange={e => setDealTitle(e.target.value)}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Issue Date"
             type="date"

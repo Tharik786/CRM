@@ -12,7 +12,16 @@ export interface User {
   notificationsEnabled: boolean;
 }
 
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'unqualified' | 'converted';
+export type LeadStatus =
+  | 'new'
+  | 'qualified'
+  | 'proposal'
+  | 'discussion'
+  | 'won'
+  | 'lost'
+  | 'contacted'
+  | 'unqualified'
+  | 'converted';
 export type LeadSource = 'website' | 'linkedin' | 'referral' | 'cold_outreach' | 'event' | 'inbound_call';
 
 export interface Lead {

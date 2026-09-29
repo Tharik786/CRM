@@ -15,6 +15,7 @@ import {
   DeviceInventoryItem
 } from '../types/crm';
 import { crmService } from '../api/services/crmService';
+import { CrmStorage } from '../api/storage';
 
 export interface ToastMessage {
   id: string;
@@ -71,6 +72,7 @@ interface CrmContextType {
   // Settings
   updateSettings: (settings: WorkspaceSettings) => Promise<WorkspaceSettings>;
   resetDatabase: () => Promise<void>;
+  loadMockData: () => Promise<void>;
 
   // Global Search & Filter
   globalSearch: (query: string) => {
@@ -182,6 +184,7 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [addToast]);
 
   useEffect(() => {
+    CrmStorage.init();
     refreshAll();
   }, [refreshAll]);
 
@@ -365,7 +368,13 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetDatabase = async () => {
     await crmService.clearAllData();
     await refreshAll();
-    addToast({ type: 'info', title: 'Data Cleared', message: 'All CRM records have been reset to clean state.' });
+    addToast({ type: 'info', title: 'Data Cleared', message: 'All CRM records have been reset with fresh demo records.' });
+  };
+
+  const loadMockData = async () => {
+    await crmService.clearAllData();
+    await refreshAll();
+    addToast({ type: 'success', title: 'Mock Data Populated', message: 'Added 5 dummy records across all modules and pages!' });
   };
 
   // Operations Handlers
@@ -495,6 +504,7 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addActivity,
         updateSettings,
         resetDatabase,
+        loadMockData,
         globalSearch,
         installations,
         installerSchedules,

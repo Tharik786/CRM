@@ -4,11 +4,12 @@ import { useCrm } from '../../context/CrmContext';
 import { Card, CardHeader, CardBody } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Save, Camera, Upload, Trash2 } from 'lucide-react';
+import { Save, Camera, Upload, Trash2, RefreshCw } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
   const { user, updateProfile } = useAuth();
-  const { addToast } = useCrm();
+  const { addToast, loadMockData } = useCrm();
+  const [isResetting, setIsResetting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Profile Form State
@@ -203,6 +204,42 @@ export const SettingsPage: React.FC = () => {
               </Button>
             </div>
           </form>
+        </CardBody>
+      </Card>
+
+      {/* Demo Mock Data Management */}
+      <Card>
+        <CardHeader
+          title="Demo Mock Data Administration"
+          subtitle="Populate or restore 5 realistic records across all CRM modules and pages"
+        />
+        <CardBody className="space-y-4">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Click below to instantly refresh and populate 5 comprehensive sample records across all modules:
+            <strong className="text-slate-700 font-semibold block mt-1">
+              • 5 Inbound Enquiries (Leads) &nbsp;|&nbsp; 5 Clients & Organizations &nbsp;|&nbsp; 5 Pipeline Deals &nbsp;|&nbsp; 5 Commercial Quotations &nbsp;|&nbsp; 5 Field Installations &nbsp;|&nbsp; 5 Installer Visit Schedules &nbsp;|&nbsp; 5 Device Inventory items &nbsp;|&nbsp; 5 Follow-up Tasks &nbsp;|&nbsp; 5 Activity Timeline entries
+            </strong>
+          </p>
+
+          <div className="pt-2 flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              isLoading={isResetting}
+              onClick={async () => {
+                setIsResetting(true);
+                try {
+                  await loadMockData();
+                } finally {
+                  setIsResetting(false);
+                }
+              }}
+              icon={<RefreshCw className="w-4 h-4 text-brand-600" />}
+            >
+              Reset / Populate 5 Dummy Records for All Pages
+            </Button>
+          </div>
         </CardBody>
       </Card>
     </div>

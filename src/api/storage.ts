@@ -13,6 +13,18 @@ import {
   InstallerScheduleItem,
   DeviceInventoryItem
 } from '../types/crm';
+import {
+  MOCK_COMPANIES,
+  MOCK_CONTACTS,
+  MOCK_LEADS,
+  MOCK_DEALS,
+  MOCK_QUOTATIONS,
+  MOCK_INSTALLATIONS,
+  MOCK_INSTALLER_SCHEDULES,
+  MOCK_DEVICE_INVENTORY,
+  MOCK_TASKS,
+  MOCK_ACTIVITIES,
+} from './mockData';
 
 const STORAGE_KEYS = {
   USER: 'zancrm_user',
@@ -31,12 +43,12 @@ const STORAGE_KEYS = {
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
-  companyName: 'My Workspace',
+  companyName: 'ZanCompute Global Workspace',
   defaultCurrency: 'USD',
   fiscalYearStart: 'January',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   emailNotifications: true,
-  autoLeadScoring: false,
+  autoLeadScoring: true,
   twoFactorAuth: false,
 };
 
@@ -57,55 +69,84 @@ function setStorage<T>(key: string, data: T): void {
   }
 }
 
+const SEED_VERSION_KEY = 'zancrm_mock_data_version';
+const CURRENT_SEED_VERSION = 'v2_5_records_all';
+
 export class CrmStorage {
   static init(): void {
-    if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) {
-      setStorage(STORAGE_KEYS.COMPANIES, []);
+    const isSeeded = localStorage.getItem(SEED_VERSION_KEY) === CURRENT_SEED_VERSION;
+    if (!isSeeded) {
+      this.seedMockData();
+      localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
+      return;
     }
-    if (!localStorage.getItem(STORAGE_KEYS.CONTACTS)) {
-      setStorage(STORAGE_KEYS.CONTACTS, []);
+
+    const contacts = this.getContacts();
+    if (!contacts || contacts.length === 0) {
+      setStorage(STORAGE_KEYS.CONTACTS, MOCK_CONTACTS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.LEADS)) {
-      setStorage(STORAGE_KEYS.LEADS, []);
+
+    const leads = this.getLeads();
+    if (!leads || leads.length === 0) {
+      setStorage(STORAGE_KEYS.LEADS, MOCK_LEADS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.DEALS)) {
-      setStorage(STORAGE_KEYS.DEALS, []);
+
+    const deals = this.getDeals();
+    if (!deals || deals.length === 0) {
+      setStorage(STORAGE_KEYS.DEALS, MOCK_DEALS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.QUOTATIONS)) {
-      setStorage(STORAGE_KEYS.QUOTATIONS, []);
+
+    const quotations = this.getQuotations();
+    if (!quotations || quotations.length === 0) {
+      setStorage(STORAGE_KEYS.QUOTATIONS, MOCK_QUOTATIONS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.TASKS)) {
-      setStorage(STORAGE_KEYS.TASKS, []);
+
+    const tasks = this.getTasks();
+    if (!tasks || tasks.length === 0) {
+      setStorage(STORAGE_KEYS.TASKS, MOCK_TASKS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.ACTIVITIES)) {
-      setStorage(STORAGE_KEYS.ACTIVITIES, []);
+
+    const activities = this.getActivities();
+    if (!activities || activities.length === 0) {
+      setStorage(STORAGE_KEYS.ACTIVITIES, MOCK_ACTIVITIES);
     }
+
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
       setStorage(STORAGE_KEYS.SETTINGS, DEFAULT_WORKSPACE_SETTINGS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.INSTALLATIONS)) {
-      setStorage(STORAGE_KEYS.INSTALLATIONS, []);
+
+    const installations = this.getInstallations();
+    if (!installations || installations.length === 0) {
+      setStorage(STORAGE_KEYS.INSTALLATIONS, MOCK_INSTALLATIONS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.INSTALLER_SCHEDULE)) {
-      setStorage(STORAGE_KEYS.INSTALLER_SCHEDULE, []);
+
+    const schedules = this.getInstallerSchedules();
+    if (!schedules || schedules.length === 0) {
+      setStorage(STORAGE_KEYS.INSTALLER_SCHEDULE, MOCK_INSTALLER_SCHEDULES);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.DEVICE_INVENTORY)) {
-      setStorage(STORAGE_KEYS.DEVICE_INVENTORY, []);
+
+    const inventory = this.getDeviceInventory();
+    if (!inventory || inventory.length === 0) {
+      setStorage(STORAGE_KEYS.DEVICE_INVENTORY, MOCK_DEVICE_INVENTORY);
     }
   }
 
-  static clearAll(): void {
-    setStorage(STORAGE_KEYS.COMPANIES, []);
-    setStorage(STORAGE_KEYS.CONTACTS, []);
-    setStorage(STORAGE_KEYS.LEADS, []);
-    setStorage(STORAGE_KEYS.DEALS, []);
-    setStorage(STORAGE_KEYS.QUOTATIONS, []);
-    setStorage(STORAGE_KEYS.TASKS, []);
-    setStorage(STORAGE_KEYS.ACTIVITIES, []);
+  static seedMockData(): void {
+    setStorage(STORAGE_KEYS.COMPANIES, MOCK_COMPANIES);
+    setStorage(STORAGE_KEYS.CONTACTS, MOCK_CONTACTS);
+    setStorage(STORAGE_KEYS.LEADS, MOCK_LEADS);
+    setStorage(STORAGE_KEYS.DEALS, MOCK_DEALS);
+    setStorage(STORAGE_KEYS.QUOTATIONS, MOCK_QUOTATIONS);
+    setStorage(STORAGE_KEYS.TASKS, MOCK_TASKS);
+    setStorage(STORAGE_KEYS.ACTIVITIES, MOCK_ACTIVITIES);
     setStorage(STORAGE_KEYS.SETTINGS, DEFAULT_WORKSPACE_SETTINGS);
-    setStorage(STORAGE_KEYS.INSTALLATIONS, []);
-    setStorage(STORAGE_KEYS.INSTALLER_SCHEDULE, []);
-    setStorage(STORAGE_KEYS.DEVICE_INVENTORY, []);
+    setStorage(STORAGE_KEYS.INSTALLATIONS, MOCK_INSTALLATIONS);
+    setStorage(STORAGE_KEYS.INSTALLER_SCHEDULE, MOCK_INSTALLER_SCHEDULES);
+    setStorage(STORAGE_KEYS.DEVICE_INVENTORY, MOCK_DEVICE_INVENTORY);
+  }
+
+  static clearAll(): void {
+    this.seedMockData();
   }
 
   // Auth

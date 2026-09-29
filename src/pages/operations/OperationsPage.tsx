@@ -7,7 +7,7 @@ import {
   ScheduleStatus,
   DeviceInventoryItem,
 } from '../../types/crm';
-import { Card, CardBody } from '../../components/common/Card';
+import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Table, Column, Pagination } from '../../components/common/Table';

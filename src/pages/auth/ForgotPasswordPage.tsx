@@ -48,8 +48,8 @@ export const ForgotPasswordPage: React.FC = () => {
       <div className="absolute top-0 -left-40 w-96 h-96 bg-brand-600/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 -right-40 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-lg relative z-10">
-        <div className="bg-slate-800/80 border border-slate-700/80 backdrop-blur-xl py-8 px-6 shadow-2xl rounded-2xl sm:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="bg-slate-800/80 border border-slate-700/80 backdrop-blur-xl py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
           {/* Brand Logo & Title */}
           <div className="flex justify-center items-center gap-3 mb-6">
             <img

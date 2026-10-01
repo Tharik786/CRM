@@ -11,7 +11,10 @@ import {
   DealStage,
   Installation,
   InstallerScheduleItem,
-  DeviceInventoryItem
+  DeviceInventoryItem,
+  ClientDeviceRequirement,
+  DeviceStockItem,
+  StockActionType,
 } from '../types/crm';
 import {
   MOCK_COMPANIES,
@@ -24,6 +27,9 @@ import {
   MOCK_DEVICE_INVENTORY,
   MOCK_TASKS,
   MOCK_ACTIVITIES,
+  MOCK_CLIENT_REQUIREMENTS,
+  DEVICE_DEFINITIONS,
+  MOCK_DEVICE_STOCK,
 } from './mockData';
 
 const STORAGE_KEYS = {
@@ -40,6 +46,8 @@ const STORAGE_KEYS = {
   INSTALLATIONS: 'zancrm_installations',
   INSTALLER_SCHEDULE: 'zancrm_installer_schedule',
   DEVICE_INVENTORY: 'zancrm_device_inventory',
+  CLIENT_REQUIREMENTS: 'zancrm_client_requirements',
+  DEVICE_STOCK: 'zancrm_device_stock',
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -50,6 +58,16 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   emailNotifications: true,
   autoLeadScoring: true,
   twoFactorAuth: false,
+};
+
+export const DEFAULT_USER: User = {
+  id: 'usr_tharik',
+  name: 'Tharik',
+  email: 'tharik@zancompute.com',
+  role: 'sales_manager',
+  title: 'Sales Manager',
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  notificationsEnabled: true,
 };
 
 function getStorage<T>(key: string, fallback: T): T {
@@ -70,10 +88,11 @@ function setStorage<T>(key: string, data: T): void {
 }
 
 const SEED_VERSION_KEY = 'zancrm_mock_data_version';
-const CURRENT_SEED_VERSION = 'v2_5_records_all';
+const CURRENT_SEED_VERSION = 'v5_device_inventory';
 
 export class CrmStorage {
   static init(): void {
+    if (typeof localStorage === 'undefined') return;
     const isSeeded = localStorage.getItem(SEED_VERSION_KEY) === CURRENT_SEED_VERSION;
     if (!isSeeded) {
       this.seedMockData();
@@ -129,6 +148,16 @@ export class CrmStorage {
     if (!inventory || inventory.length === 0) {
       setStorage(STORAGE_KEYS.DEVICE_INVENTORY, MOCK_DEVICE_INVENTORY);
     }
+
+    const reqs = this.getClientRequirementsMap();
+    if (!reqs || Object.keys(reqs).length === 0) {
+      setStorage(STORAGE_KEYS.CLIENT_REQUIREMENTS, MOCK_CLIENT_REQUIREMENTS);
+    }
+
+    const stock = this.getDeviceStock();
+    if (!stock || stock.length === 0) {
+      setStorage(STORAGE_KEYS.DEVICE_STOCK, MOCK_DEVICE_STOCK);
+    }
   }
 
   static seedMockData(): void {
@@ -143,6 +172,8 @@ export class CrmStorage {
     setStorage(STORAGE_KEYS.INSTALLATIONS, MOCK_INSTALLATIONS);
     setStorage(STORAGE_KEYS.INSTALLER_SCHEDULE, MOCK_INSTALLER_SCHEDULES);
     setStorage(STORAGE_KEYS.DEVICE_INVENTORY, MOCK_DEVICE_INVENTORY);
+    setStorage(STORAGE_KEYS.CLIENT_REQUIREMENTS, MOCK_CLIENT_REQUIREMENTS);
+    setStorage(STORAGE_KEYS.DEVICE_STOCK, MOCK_DEVICE_STOCK);
   }
 
   static clearAll(): void {
@@ -150,8 +181,8 @@ export class CrmStorage {
   }
 
   // Auth
-  static getUser(): User | null {
-    return getStorage<User | null>(STORAGE_KEYS.USER, null);
+  static getUser(): User {
+    return getStorage<User>(STORAGE_KEYS.USER, DEFAULT_USER);
   }
 
   static setUser(user: User | null): void {
@@ -241,8 +272,24 @@ export class CrmStorage {
   }
 
   // Deals
+  static normalizeStage(stage: string): DealStage {
+    if (stage === 'qualification') return 'new';
+    if (stage === 'needs_analysis') return 'proposal';
+    if (stage === 'proposal_sent') return 'proposal';
+    if (stage === 'closed_won') return 'won';
+    if (stage === 'closed_lost') return 'lost';
+    if (['new', 'proposal', 'negotiation', 'won', 'lost', 'cold'].includes(stage)) {
+      return stage as DealStage;
+    }
+    return 'new';
+  }
+
   static getDeals(): Deal[] {
-    return getStorage<Deal[]>(STORAGE_KEYS.DEALS, []);
+    const list = getStorage<Deal[]>(STORAGE_KEYS.DEALS, []);
+    return list.map(d => ({
+      ...d,
+      stage: this.normalizeStage(d.stage),
+    }));
   }
 
   static saveDeal(deal: Deal): Deal {
@@ -263,15 +310,19 @@ export class CrmStorage {
     if (deal) {
       deal.stage = stage;
       deal.updatedAt = new Date().toISOString();
-      if (stage === 'closed_won') deal.probability = 100;
-      if (stage === 'closed_lost') deal.probability = 0;
+      if (stage === 'won') deal.probability = 100;
+      if (stage === 'lost') deal.probability = 0;
+      if (stage === 'cold') deal.probability = 10;
+      if (stage === 'new') deal.probability = 20;
+      if (stage === 'proposal') deal.probability = 50;
+      if (stage === 'negotiation') deal.probability = 80;
       setStorage(STORAGE_KEYS.DEALS, list);
 
       const currentUser = this.getUser();
       this.addActivity({
         id: `act_${Date.now()}`,
         type: 'deal_stage_changed',
-        title: `Deal "${deal.title}" moved to ${stage.replace('_', ' ').toUpperCase()}`,
+        title: `Deal "${deal.title}" moved to ${stage.toUpperCase()}`,
         description: `Probability updated to ${deal.probability}%. Total value: $${deal.value.toLocaleString()}`,
         performedBy: currentUser?.name || 'User',
         performedById: currentUser?.id || 'usr_current',
@@ -449,6 +500,169 @@ export class CrmStorage {
   static deleteDeviceInventory(id: string): void {
     const list = this.getDeviceInventory().filter(d => d.id !== id);
     setStorage(STORAGE_KEYS.DEVICE_INVENTORY, list);
+  }
+
+  // Client Requirements
+  static getClientRequirementsMap(): Record<string, ClientDeviceRequirement[]> {
+    return getStorage<Record<string, ClientDeviceRequirement[]>>(STORAGE_KEYS.CLIENT_REQUIREMENTS, MOCK_CLIENT_REQUIREMENTS);
+  }
+
+  static getClientRequirements(clientId: string): ClientDeviceRequirement[] {
+    const map = this.getClientRequirementsMap();
+    if (map[clientId] && map[clientId].length > 0) {
+      return map[clientId];
+    }
+    // Generate default requirements if not exists for this client
+    const defaults: ClientDeviceRequirement[] = DEVICE_DEFINITIONS.map(def => ({
+      id: `req_${clientId}_${def.key}`,
+      clientId,
+      deviceKey: def.key,
+      deviceName: def.name,
+      deviceDescription: def.description,
+      required: 0,
+      installed: 0,
+      indiaStock: def.defaultIndiaStock,
+      updatedAt: new Date().toISOString(),
+    }));
+    map[clientId] = defaults;
+    setStorage(STORAGE_KEYS.CLIENT_REQUIREMENTS, map);
+    return defaults;
+  }
+
+  static saveClientRequirements(clientId: string, requirements: ClientDeviceRequirement[]): ClientDeviceRequirement[] {
+    const map = this.getClientRequirementsMap();
+    map[clientId] = requirements;
+    setStorage(STORAGE_KEYS.CLIENT_REQUIREMENTS, map);
+    return requirements;
+  }
+
+  static updateClientRequirement(clientId: string, deviceKey: string, required: number): ClientDeviceRequirement[] {
+    const list = this.getClientRequirements(clientId);
+    const updated = list.map(item => {
+      if (item.deviceKey === deviceKey) {
+        return {
+          ...item,
+          required: Math.max(0, required),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return item;
+    });
+    return this.saveClientRequirements(clientId, updated);
+  }
+
+  // === DEVICE STOCK INVENTORY ===
+  static getDeviceStock(): DeviceStockItem[] {
+    const stock = getStorage<DeviceStockItem[]>(STORAGE_KEYS.DEVICE_STOCK, []);
+    if (!stock || stock.length === 0) {
+      setStorage(STORAGE_KEYS.DEVICE_STOCK, MOCK_DEVICE_STOCK);
+      return MOCK_DEVICE_STOCK;
+    }
+    // Ensure all 10 device definitions are present
+    const existingKeys = new Set(stock.map(s => s.deviceKey));
+    let hasMissing = false;
+    const completeStock = [...stock];
+
+    for (const def of DEVICE_DEFINITIONS) {
+      if (!existingKeys.has(def.key)) {
+        const mockItem = MOCK_DEVICE_STOCK.find(m => m.deviceKey === def.key);
+        completeStock.push(
+          mockItem || {
+            id: `stock_${def.key}`,
+            deviceKey: def.key,
+            deviceName: def.name,
+            deviceDescription: def.description,
+            usWarehouse: 10,
+            indiaProduction: def.defaultIndiaStock || 20,
+            updatedAt: new Date().toISOString(),
+          }
+        );
+        hasMissing = true;
+      }
+    }
+
+    if (hasMissing) {
+      setStorage(STORAGE_KEYS.DEVICE_STOCK, completeStock);
+      return completeStock;
+    }
+
+    return stock;
+  }
+
+  static saveDeviceStock(stock: DeviceStockItem[]): DeviceStockItem[] {
+    setStorage(STORAGE_KEYS.DEVICE_STOCK, stock);
+    return stock;
+  }
+
+  static recordStockAction(
+    deviceKey: string,
+    action: StockActionType,
+    quantity: number
+  ): { updatedItem: DeviceStockItem; allStock: DeviceStockItem[] } {
+    if (!quantity || !Number.isInteger(quantity) || quantity <= 0) {
+      throw new Error('Quantity must be a positive whole number greater than zero.');
+    }
+
+    const currentStock = this.getDeviceStock();
+    const targetIndex = currentStock.findIndex(item => item.deviceKey === deviceKey);
+    if (targetIndex === -1) {
+      throw new Error(`Device with key "${deviceKey}" was not found in inventory.`);
+    }
+
+    const item = { ...currentStock[targetIndex] };
+
+    if (action === 'production_ready') {
+      // Add quantity to India Production
+      item.indiaProduction += quantity;
+    } else if (action === 'shipped_to_us') {
+      // Subtract quantity from India Production, add quantity to US Warehouse
+      if (quantity > item.indiaProduction) {
+        throw new Error(
+          `Insufficient stock in India Production. Available: ${item.indiaProduction}, Requested: ${quantity}`
+        );
+      }
+      item.indiaProduction -= quantity;
+      item.usWarehouse += quantity;
+    } else if (action === 'installed_client') {
+      // Subtract quantity from US Warehouse
+      if (quantity > item.usWarehouse) {
+        throw new Error(
+          `Insufficient stock in US Warehouse. Available: ${item.usWarehouse}, Requested: ${quantity}`
+        );
+      }
+      item.usWarehouse -= quantity;
+    } else {
+      throw new Error(`Invalid stock action: ${action}`);
+    }
+
+    item.updatedAt = new Date().toISOString();
+    const updatedStock = [...currentStock];
+    updatedStock[targetIndex] = item;
+    this.saveDeviceStock(updatedStock);
+
+    // Keep India stock in sync with client requirements if indiaProduction changed
+    if (action === 'production_ready' || action === 'shipped_to_us') {
+      const reqMap = this.getClientRequirementsMap();
+      let changed = false;
+      for (const cId in reqMap) {
+        reqMap[cId] = reqMap[cId].map(req => {
+          if (req.deviceKey === deviceKey) {
+            changed = true;
+            return {
+              ...req,
+              indiaStock: item.indiaProduction,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return req;
+        });
+      }
+      if (changed) {
+        setStorage(STORAGE_KEYS.CLIENT_REQUIREMENTS, reqMap);
+      }
+    }
+
+    return { updatedItem: item, allStock: updatedStock };
   }
 }
 

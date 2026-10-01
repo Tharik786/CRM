@@ -5,6 +5,8 @@ export interface Column<T> {
   header: React.ReactNode;
   render?: (item: T) => React.ReactNode;
   className?: string;
+  headerClassName?: string;
+  width?: string;
 }
 
 interface TableProps<T> {
@@ -14,6 +16,9 @@ interface TableProps<T> {
   onRowClick?: (item: T) => void;
   isLoading?: boolean;
   emptyMessage?: React.ReactNode;
+  noScroll?: boolean;
+  containerClassName?: string;
+  tableClassName?: string;
 }
 
 export function Table<T>({
@@ -23,6 +28,9 @@ export function Table<T>({
   onRowClick,
   isLoading,
   emptyMessage = 'No records found',
+  noScroll = false,
+  containerClassName = '',
+  tableClassName = '',
 }: TableProps<T>) {
   if (isLoading) {
     return (
@@ -47,16 +55,17 @@ export function Table<T>({
   }
 
   return (
-    <div className="overflow-x-auto w-full">
-      <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+    <div className={`w-full ${noScroll ? 'overflow-hidden' : 'overflow-x-auto'} ${containerClassName}`}>
+      <table className={`w-full divide-y divide-slate-200 text-left text-sm ${tableClassName}`}>
         <thead className="bg-slate-50/75">
           <tr>
             {columns.map(col => (
               <th
                 key={col.key}
                 scope="col"
-                className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 ${
-                  col.className || ''
+                style={col.width ? { width: col.width } : undefined}
+                className={`px-3 sm:px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap ${
+                  col.headerClassName || col.className || ''
                 }`}
               >
                 {col.header}
@@ -74,7 +83,11 @@ export function Table<T>({
               }`}
             >
               {columns.map(col => (
-                <td key={col.key} className={`px-4 py-3.5 whitespace-nowrap text-slate-700 ${col.className || ''}`}>
+                <td
+                  key={col.key}
+                  style={col.width ? { width: col.width } : undefined}
+                  className={`px-3 sm:px-4 py-3.5 text-slate-700 ${col.className || ''}`}
+                >
                   {col.render
                     ? col.render(item)
                     : ((item as Record<string, unknown>)[col.key] as React.ReactNode)}

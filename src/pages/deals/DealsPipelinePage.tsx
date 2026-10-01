@@ -1,44 +1,92 @@
 import React, { useState, useMemo } from 'react';
 import { useCrm } from '../../context/CrmContext';
-import { useAuth } from '../../context/AuthContext';
 import { Deal, DealStage } from '../../types/crm';
 import { DealModalForm } from '../../components/forms/DealModalForm';
+import { DealDetailsModal } from '../../components/deals/DealDetailsModal';
 import { Button } from '../../components/common/Button';
-import { Badge } from '../../components/common/Badge';
-import { Table, Column, Pagination } from '../../components/common/Table';
-import { formatCurrency, formatDate, exportToCSV } from '../../utils/formatters';
+import { formatCurrency, exportToCSV } from '../../utils/formatters';
 import {
-  Plus,
   Search,
   Download,
-  DollarSign,
-  TrendingUp,
-  Award,
   Edit2,
-  Trash2,
   Building2,
   User,
-  Calendar,
   Filter,
+  XCircle,
 } from 'lucide-react';
 
+interface StageColumnConfig {
+  stage: DealStage;
+  label: string;
+  badgeColor: string;
+  dotColor: string;
+  dropBorder: string;
+}
+
+const STAGE_CONFIGS: StageColumnConfig[] = [
+  {
+    stage: 'new',
+    label: '1. New',
+    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+    dotColor: 'bg-blue-500',
+    dropBorder: 'border-blue-400 bg-blue-50/40',
+  },
+  {
+    stage: 'proposal',
+    label: '2. Proposal',
+    badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
+    dotColor: 'bg-amber-500',
+    dropBorder: 'border-amber-400 bg-amber-50/40',
+  },
+  {
+    stage: 'negotiation',
+    label: '3. Negotiation',
+    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+    dotColor: 'bg-purple-500',
+    dropBorder: 'border-purple-400 bg-purple-50/40',
+  },
+  {
+    stage: 'won',
+    label: '4. Won',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    dotColor: 'bg-emerald-500',
+    dropBorder: 'border-emerald-400 bg-emerald-50/40',
+  },
+  {
+    stage: 'lost',
+    label: '5. Lost',
+    badgeColor: 'bg-rose-50 text-rose-700 border-rose-200',
+    dotColor: 'bg-rose-500',
+    dropBorder: 'border-rose-400 bg-rose-50/40',
+  },
+  {
+    stage: 'cold',
+    label: '6. Cold',
+    badgeColor: 'bg-slate-100 text-slate-700 border-slate-300',
+    dotColor: 'bg-slate-400',
+    dropBorder: 'border-slate-400 bg-slate-100/50',
+  },
+];
+
+const STAGE_ORDER: DealStage[] = STAGE_CONFIGS.map(c => c.stage);
+
 export const DealsPipelinePage: React.FC = () => {
-  const { deals, createDeal, updateDeal, deleteDeal, isLoading } = useCrm();
-  const { user } = useAuth();
+  const { deals, createDeal, updateDeal, updateDealStage } = useCrm();
 
   // Search, Filter, Sort State
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('value_desc');
+  const sortBy = 'value_desc';
 
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  // Drag and drop state
+  const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<DealStage | null>(null);
 
-  // Modals
+  // Modals (Create, Edit & Details)
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  const [selectedDealForDetails, setSelectedDealForDetails] = useState<Deal | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
 
   // Filter & Sort Logic
   const filteredDeals = useMemo(() => {
@@ -52,16 +100,7 @@ export const DealsPipelinePage: React.FC = () => {
 
         const matchesStage = stageFilter === 'all' || deal.stage === stageFilter;
 
-        let matchesStatus = true;
-        if (statusFilter === 'active') {
-          matchesStatus = deal.stage !== 'closed_won' && deal.stage !== 'closed_lost';
-        } else if (statusFilter === 'won') {
-          matchesStatus = deal.stage === 'closed_won';
-        } else if (statusFilter === 'lost') {
-          matchesStatus = deal.stage === 'closed_lost';
-        }
-
-        return matchesSearch && matchesStage && matchesStatus;
+        return matchesSearch && matchesStage;
       })
       .sort((a, b) => {
         if (sortBy === 'value_desc') return b.value - a.value;
@@ -76,59 +115,96 @@ export const DealsPipelinePage: React.FC = () => {
         if (sortBy === 'name_desc') return b.title.localeCompare(a.title);
         return 0;
       });
-  }, [deals, searchTerm, stageFilter, statusFilter, sortBy]);
+  }, [deals, searchTerm, stageFilter, sortBy]);
 
-  // Paginated Slice
-  const totalPages = Math.ceil(filteredDeals.length / itemsPerPage);
-  const paginatedDeals = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredDeals.slice(start, start + itemsPerPage);
-  }, [filteredDeals, currentPage]);
+  // Active columns to display on Kanban
+  const visibleColumns = useMemo(() => {
+    if (stageFilter !== 'all') {
+      return STAGE_CONFIGS.filter(c => c.stage === stageFilter);
+    }
+    return STAGE_CONFIGS;
+  }, [stageFilter]);
 
-  // Handler helpers that reset pagination
+  const getGridColsClass = (count: number) => {
+    switch (count) {
+      case 1:
+        return 'grid-cols-1 max-w-xl';
+      case 2:
+        return 'grid-cols-1 sm:grid-cols-2';
+      case 3:
+        return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3';
+      case 4:
+        return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
+      case 5:
+        return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5';
+      default:
+        return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6';
+    }
+  };
+
+  // Handler helpers
   const handleSearchChange = (val: string) => {
     setSearchTerm(val);
-    setCurrentPage(1);
   };
   const handleStageFilterChange = (val: string) => {
     setStageFilter(val);
-    setCurrentPage(1);
-  };
-  const handleStatusFilterChange = (val: string) => {
-    setStatusFilter(val);
-    setCurrentPage(1);
-  };
-  const handleSortChange = (val: string) => {
-    setSortBy(val);
-    setCurrentPage(1);
   };
 
-  // Pipeline Metrics
-  const totalValue = deals.reduce((sum, d) => sum + d.value, 0);
-  const weightedValue = deals.reduce((sum, d) => sum + (d.value * (d.probability / 100)), 0);
-  const wonDeals = deals.filter(d => d.stage === 'closed_won');
-  const wonTotal = wonDeals.reduce((sum, d) => sum + d.value, 0);
 
   const handleEditDeal = (deal: Deal) => {
     setEditingDeal(deal);
     setModalOpen(true);
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (window.confirm(`Delete opportunity "${title}"?`)) {
-      await deleteDeal(id);
+  const handleViewDeal = (deal: Deal) => {
+    setSelectedDealForDetails(deal);
+    setDetailsModalOpen(true);
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, dealId: string) => {
+    e.dataTransfer.setData('text/plain', dealId);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedDealId(dealId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, stage: DealStage) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverStage !== stage) {
+      setDragOverStage(stage);
     }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only reset if leaving current drop target
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOverStage(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStage: DealStage) => {
+    e.preventDefault();
+    setDragOverStage(null);
+    const dealId = e.dataTransfer.getData('text/plain') || draggedDealId;
+    if (dealId) {
+      const deal = deals.find(d => d.id === dealId);
+      if (deal && deal.stage !== targetStage) {
+        await updateDealStage(dealId, targetStage);
+      }
+    }
+    setDraggedDealId(null);
   };
 
   const handleExport = () => {
     exportToCSV(
-      'ZanCRM_Deals_List',
+      'ZanCRM_Deals_Pipeline',
       filteredDeals,
       [
         { key: 'title', label: 'Deal Name' },
         { key: 'companyName', label: 'Company' },
         { key: 'value', label: 'Deal Value ($)' },
         { key: 'stage', label: 'Stage' },
+        { key: 'lostReason', label: 'Lost Reason' },
         { key: 'assignedTo', label: 'Owner' },
         { key: 'expectedCloseDate', label: 'Expected Close Date' },
         { key: 'contactName', label: 'Contact' },
@@ -137,157 +213,10 @@ export const DealsPipelinePage: React.FC = () => {
     );
   };
 
-  const stageVariantMap: Record<DealStage, 'blue' | 'indigo' | 'amber' | 'purple' | 'green' | 'rose'> = {
-    qualification: 'blue',
-    needs_analysis: 'indigo',
-    proposal_sent: 'amber',
-    negotiation: 'purple',
-    closed_won: 'green',
-    closed_lost: 'rose',
-  };
-
-  const stageLabels: Record<DealStage, string> = {
-    qualification: 'New',
-    needs_analysis: 'Qualified',
-    proposal_sent: 'Proposal',
-    negotiation: 'Discussion',
-    closed_won: 'Won',
-    closed_lost: 'Lost',
-  };
-
-  const getOwnerName = (deal: Deal) => {
-    if (!deal.assignedTo || deal.assignedTo === 'usr_current' || deal.assignedTo === user?.id) {
-      return user?.name || 'Unassigned';
-    }
-    return deal.assignedTo;
-  };
-
-  const getDealStatus = (deal: Deal): { label: string; variant: 'green' | 'rose' | 'indigo' } => {
-    if (deal.stage === 'closed_won') {
-      return { label: 'Won', variant: 'green' };
-    }
-    if (deal.stage === 'closed_lost') {
-      return { label: 'Lost', variant: 'rose' };
-    }
-    return { label: 'Active', variant: 'indigo' };
-  };
-
-  // Table Columns: Deal Name, Company, Deal Value, Stage, Owner, Expected Close Date, Status
-  const columns: Column<Deal>[] = [
-    {
-      key: 'title',
-      header: 'Deal Name',
-      render: deal => (
-        <div className="max-w-xs">
-          <span className="font-bold text-slate-900 text-xs sm:text-sm hover:text-brand-600 cursor-pointer block truncate" onClick={() => handleEditDeal(deal)}>
-            {deal.title}
-          </span>
-          {deal.contactName && (
-            <div className="text-[11px] text-slate-400 mt-0.5 truncate">
-              Contact: {deal.contactName}
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'companyName',
-      header: 'Company',
-      render: deal => (
-        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span className="truncate">{deal.companyName || '—'}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'value',
-      header: 'Deal Value',
-      render: deal => (
-        <div>
-          <div className="font-mono font-bold text-slate-900 text-xs sm:text-sm">
-            {formatCurrency(deal.value)}
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono">
-            {deal.probability}% win prob
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'stage',
-      header: 'Stage',
-      render: deal => (
-        <Badge variant={stageVariantMap[deal.stage]} size="sm">
-          {stageLabels[deal.stage] || deal.stage}
-        </Badge>
-      ),
-    },
-    {
-      key: 'owner',
-      header: 'Owner',
-      render: deal => (
-        <div className="flex items-center gap-1.5 text-xs text-slate-700">
-          <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
-            <User className="w-3 h-3 text-slate-500" />
-          </div>
-          <span className="font-medium truncate">{getOwnerName(deal)}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'expectedCloseDate',
-      header: 'Expected Close Date',
-      render: deal => (
-        <div className="flex items-center gap-1.5 text-xs text-slate-600">
-          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span>{formatDate(deal.expectedCloseDate)}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: deal => {
-        const status = getDealStatus(deal);
-        return (
-          <Badge variant={status.variant} size="sm">
-            {status.label}
-          </Badge>
-        );
-      },
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      className: 'text-right',
-      render: deal => (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            type="button"
-            onClick={() => handleEditDeal(deal)}
-            title="Edit Deal"
-            className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleDelete(deal.id, deal.title)}
-            title="Delete Deal"
-            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ),
-    },
-  ];
-
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="space-y-3 animate-fade-in pb-6">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -297,9 +226,12 @@ export const DealsPipelinePage: React.FC = () => {
               {filteredDeals.length} {filteredDeals.length === 1 ? 'Deal' : 'Deals'}
             </span>
           </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Track and advance opportunities visually across deal stages with live stage metrics.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -308,56 +240,11 @@ export const DealsPipelinePage: React.FC = () => {
           >
             Export CSV
           </Button>
-
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => {
-              setEditingDeal(null);
-              setModalOpen(true);
-            }}
-            icon={<Plus className="w-4 h-4" />}
-          >
-            New Opportunity
-          </Button>
-        </div>
-      </div>
-
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-subtle flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-            <DollarSign className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pipeline Value</div>
-            <div className="text-xl font-extrabold text-slate-900 font-mono">{formatCurrency(totalValue)}</div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-subtle flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Expected Revenue</div>
-            <div className="text-xl font-extrabold text-slate-900 font-mono">{formatCurrency(weightedValue)}</div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-subtle flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <Award className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Revenue</div>
-            <div className="text-xl font-extrabold text-slate-900 font-mono">{formatCurrency(wonTotal)}</div>
-          </div>
         </div>
       </div>
 
       {/* Search, Filters and Sorting Bar */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-2.5">
         {/* Search */}
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
@@ -384,77 +271,232 @@ export const DealsPipelinePage: React.FC = () => {
             className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           >
             <option value="all">All Stages</option>
-            <option value="qualification">1. New</option>
-            <option value="needs_analysis">2. Qualified</option>
-            <option value="proposal_sent">3. Proposal</option>
-            <option value="negotiation">4. Discussion</option>
-            <option value="closed_won">5. Won</option>
-            <option value="closed_lost">6. Lost</option>
+            <option value="new">1. New</option>
+            <option value="proposal">2. Proposal</option>
+            <option value="negotiation">3. Negotiation</option>
+            <option value="won">4. Won</option>
+            <option value="lost">5. Lost</option>
+            <option value="cold">6. Cold</option>
           </select>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={e => handleStatusFilterChange(e.target.value)}
-            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active (Open)</option>
-            <option value="won">Won Deals</option>
-            <option value="lost">Lost Deals</option>
-          </select>
-
-          {/* Sort By */}
-          <select
-            value={sortBy}
-            onChange={e => handleSortChange(e.target.value)}
-            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          >
-            <option value="value_desc">Value: High to Low</option>
-            <option value="value_asc">Value: Low to High</option>
-            <option value="date_asc">Close Date: Earliest First</option>
-            <option value="date_desc">Close Date: Latest First</option>
-            <option value="name_asc">Deal Name: A to Z</option>
-            <option value="name_desc">Deal Name: Z to A</option>
-          </select>
         </div>
       </div>
 
-      {/* Responsive Deals Table */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-subtle overflow-hidden">
-        <Table
-          columns={columns}
-          data={paginatedDeals}
-          keyExtractor={d => d.id}
-          isLoading={isLoading}
-          emptyMessage="No deals found matching your search or filters."
-        />
+      {/* Kanban Board - 100% fitted to screen width with zero horizontal scroll */}
+      <div className="w-full pb-6">
+        <div className={`grid gap-2 sm:gap-2.5 w-full items-start ${getGridColsClass(visibleColumns.length)}`}>
+          {visibleColumns.map(column => {
+            const columnDeals = filteredDeals.filter(d => d.stage === column.stage);
+            const columnTotal = columnDeals.reduce((sum, d) => sum + d.value, 0);
+            const isOver = dragOverStage === column.stage;
 
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredDeals.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={page => setCurrentPage(page)}
-            />
-          </div>
-        )}
+            return (
+              <div
+                key={column.stage}
+                onDragOver={e => handleDragOver(e, column.stage)}
+                onDragLeave={handleDragLeave}
+                onDrop={e => handleDrop(e, column.stage)}
+                className={`w-full min-w-0 flex flex-col rounded-xl bg-slate-50/90 border transition-all duration-200 ${
+                  isOver
+                    ? `${column.dropBorder} ring-2 ring-brand-500/30 scale-[1.01]`
+                    : 'border-slate-200/80 shadow-subtle'
+                }`}
+              >
+                {/* Column Header */}
+                <div className="p-2 sm:p-2.5 border-b border-slate-200/80 bg-white/80 rounded-t-xl flex items-center justify-between gap-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${column.dotColor}`} />
+                      <span className="font-bold text-xs text-slate-900 tracking-tight truncate">
+                        {column.label}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                        {columnDeals.length}
+                      </span>
+                    </div>
+                    <div className="font-mono text-xs font-black text-slate-700 pl-3.5 truncate">
+                      {formatCurrency(columnTotal)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column Body / Dropzone */}
+                <div className="p-1.5 sm:p-2 space-y-2 min-h-[300px]">
+                  {columnDeals.length === 0 ? (
+                    <div className="h-32 border-2 border-dashed border-slate-200/80 rounded-xl flex flex-col items-center justify-center p-3 text-center">
+                      <p className="text-[11px] font-semibold text-slate-500">No deals in this stage</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Drag a card here</p>
+                    </div>
+                  ) : (
+                    columnDeals.map(deal => {
+                      const isDragging = draggedDealId === deal.id;
+
+                      return (
+                        <div
+                          key={deal.id}
+                          draggable
+                          onDragStart={e => handleDragStart(e, deal.id)}
+                          onClick={() => handleViewDeal(deal)}
+                          className={`group relative bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-subtle hover:shadow-md hover:border-brand-300 transition-all duration-150 cursor-pointer space-y-2 w-full min-w-0 ${
+                            isDragging ? 'opacity-40 scale-95 border-brand-400' : ''
+                          }`}
+                        >
+                          {/* Card Top: Deal Name & Quick Action icons */}
+                          <div className="flex items-start justify-between gap-1">
+                            <h3 className="font-bold text-xs text-slate-900 group-hover:text-brand-600 leading-snug line-clamp-2 break-words flex-1 min-w-0">
+                              {deal.title}
+                            </h3>
+
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center shrink-0 bg-white/95 rounded">
+                              {deal.stage !== 'lost' && deal.stage !== 'won' && (
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    updateDealStage(deal.id, 'lost');
+                                  }}
+                                  title="Mark as Lost"
+                                  className="p-0.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                >
+                                  <XCircle className="w-3 h-3" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleEditDeal(deal);
+                                }}
+                                title="Edit"
+                                className="p-0.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Company & Contact */}
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium truncate">
+                              <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{deal.companyName || 'No Company'}</span>
+                            </div>
+                            {deal.contactName && (
+                              <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 truncate">
+                                <User className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{deal.contactName}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Deal Value & Win Probability Bar */}
+                          <div className="bg-slate-50/90 p-2 rounded-lg border border-slate-100 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-mono text-xs font-black text-slate-900 truncate">
+                                {formatCurrency(deal.value, deal.currency || 'USD')}
+                              </span>
+                              <span className="font-mono text-[9.5px] font-bold text-slate-500 shrink-0">
+                                {deal.probability}%
+                              </span>
+                            </div>
+
+                            <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  deal.stage === 'won'
+                                    ? 'bg-emerald-500'
+                                    : deal.stage === 'lost'
+                                    ? 'bg-rose-500'
+                                    : deal.probability >= 70
+                                    ? 'bg-emerald-500'
+                                    : deal.probability >= 40
+                                    ? 'bg-brand-500'
+                                    : 'bg-amber-500'
+                                }`}
+                                style={{ width: `${Math.min(100, Math.max(8, deal.probability))}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Previous & Next Stage Controls */}
+                          {(() => {
+                            const currentStageIndex = STAGE_ORDER.indexOf(deal.stage);
+                            return (
+                              <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                                {currentStageIndex > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      updateDealStage(deal.id, STAGE_ORDER[currentStageIndex - 1]);
+                                    }}
+                                    className="px-2 py-0.5 rounded text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-100 border border-slate-200 bg-white shadow-2xs transition-colors"
+                                  >
+                                    &lt;
+                                  </button>
+                                ) : (
+                                  <span />
+                                )}
+
+                                {currentStageIndex < STAGE_ORDER.length - 1 ? (
+                                  <button
+                                    type="button"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      updateDealStage(deal.id, STAGE_ORDER[currentStageIndex + 1]);
+                                    }}
+                                    className="px-2 py-0.5 rounded text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-100 border border-slate-200 bg-white shadow-2xs transition-colors"
+                                  >
+                                    &gt;
+                                  </button>
+                                ) : (
+                                  <span />
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Deal Modal Form */}
+      {/* Deal Modal Form (Create & Edit) */}
       <DealModalForm
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingDeal(null);
+        }}
         initialData={editingDeal}
         onSubmit={async data => {
-          if (editingDeal) {
+          if (editingDeal && editingDeal.id) {
             await updateDeal(editingDeal.id, data);
           } else {
             await createDeal(data);
           }
+          setModalOpen(false);
+          setEditingDeal(null);
         }}
+      />
+
+      {/* Deal Details Modal */}
+      <DealDetailsModal
+        isOpen={detailsModalOpen}
+        onClose={() => {
+          setDetailsModalOpen(false);
+          setSelectedDealForDetails(null);
+        }}
+        deal={
+          selectedDealForDetails
+            ? deals.find(d => d.id === selectedDealForDetails.id) || selectedDealForDetails
+            : null
+        }
       />
     </div>
   );

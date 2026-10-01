@@ -5,12 +5,14 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  avatar: string;
+  avatar?: string;
   title: string;
   phone?: string;
   timezone: string;
   notificationsEnabled: boolean;
 }
+
+export type CurrencyType = 'USD' | 'INR';
 
 export type LeadStatus =
   | 'new'
@@ -35,7 +37,9 @@ export interface Lead {
   score: number; // 0 - 100
   assignedTo: string; // User ID
   estimatedValue: number;
+  currency?: CurrencyType;
   notes?: string;
+  lostReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +58,8 @@ export interface Company {
   createdAt: string;
 }
 
+export type ContactStatus = 'Active' | 'Won Client' | 'Inactive';
+
 export interface Contact {
   id: string;
   name: string;
@@ -63,6 +69,7 @@ export interface Contact {
   companyId?: string;
   companyName: string;
   avatar?: string;
+  status?: ContactStatus;
   lifecycleStage: 'subscriber' | 'lead' | 'mql' | 'customer' | 'evangelist';
   lastActivityAt: string;
   assignedTo: string;
@@ -71,12 +78,12 @@ export interface Contact {
 }
 
 export type DealStage =
-  | 'qualification'
-  | 'needs_analysis'
-  | 'proposal_sent'
+  | 'new'
+  | 'proposal'
   | 'negotiation'
-  | 'closed_won'
-  | 'closed_lost';
+  | 'won'
+  | 'lost'
+  | 'cold';
 
 export interface Deal {
   id: string;
@@ -93,6 +100,7 @@ export interface Deal {
   assignedTo: string; // User ID
   priority: 'low' | 'medium' | 'high';
   tags: string[];
+  lostReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -101,9 +109,13 @@ export interface QuotationLineItem {
   id: string;
   description: string;
   quantity: number;
-  unitPrice: number;
-  discount: number; // percentage
-  amount: number;
+  unitPrice?: number;
+  unitOneTime: number;
+  unitMonthly: number;
+  discount?: number; // percentage
+  amount?: number;
+  oneTimeTotal: number;
+  monthlyTotal: number;
 }
 
 export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired';
@@ -112,6 +124,8 @@ export interface Quotation {
   id: string;
   quoteNumber: string; // e.g. Q-2026-001
   title: string;
+  leadId?: string;
+  leadName?: string;
   dealId?: string;
   dealTitle?: string;
   contactName: string;
@@ -122,9 +136,15 @@ export interface Quotation {
   validUntil: string;
   lineItems: QuotationLineItem[];
   subtotal: number;
+  oneTimeSubtotal?: number;
+  monthlySubtotal?: number;
+  annualRecurring?: number;
+  year1Total?: number;
   taxRate: number; // percentage e.g. 10
   taxAmount: number;
   total: number;
+  totalOneTime?: number;
+  totalMonthly?: number;
   notes?: string;
   terms?: string;
   createdBy: string;
@@ -153,7 +173,7 @@ export interface Task {
   createdAt: string;
 }
 
-export type ActivityType = 'call' | 'meeting' | 'email' | 'note' | 'deal_stage_changed' | 'quotation_created';
+export type ActivityType = 'call' | 'meeting' | 'email' | 'note' | 'other' | 'deal_stage_changed' | 'quotation_created';
 
 export interface Activity {
   id: string;
@@ -242,4 +262,47 @@ export interface DeviceInventoryItem {
   sku?: string;
   updatedAt: string;
 }
+
+export interface ClientDeviceRequirement {
+  id: string;
+  clientId: string;
+  deviceKey: string;
+  deviceName: string;
+  deviceDescription: string;
+  required: number;
+  installed: number;
+  indiaStock: number;
+  updatedAt?: string;
+}
+
+export interface ClientRequirementSummary {
+  clientId: string;
+  clientName: string;
+  city: string;
+  country: string;
+  countryCode: string;
+  shippingDirection: string;
+  totalRequired: number;
+  totalInstalled: number;
+  totalStillNeeded: number;
+  progressPercentage: number;
+  canFullySupply: boolean;
+  requirements: ClientDeviceRequirement[];
+}
+
+export type StockActionType =
+  | 'production_ready'
+  | 'shipped_to_us'
+  | 'installed_client';
+
+export interface DeviceStockItem {
+  id: string;
+  deviceKey: string;
+  deviceName: string;
+  deviceDescription: string;
+  usWarehouse: number;
+  indiaProduction: number;
+  updatedAt?: string;
+}
+
 

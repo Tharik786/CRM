@@ -98,12 +98,18 @@ export const ActivityTimelinePage: React.FC = () => {
       color: 'text-purple-600',
       label: 'Commercial Proposal',
     },
+    other: {
+      icon: <FileText className="w-4 h-4" />,
+      bg: 'bg-slate-50 border-slate-200',
+      color: 'text-slate-600',
+      label: 'General Interaction',
+    },
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+    <div className="space-y-3 animate-fade-in max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
             Customer Activity Timeline
@@ -121,7 +127,7 @@ export const ActivityTimelinePage: React.FC = () => {
       </div>
 
       {/* Filter and Search */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input

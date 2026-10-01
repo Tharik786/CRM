@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useCrm } from '../../context/CrmContext';
-import { useAuth } from '../../context/AuthContext';
 import { Quotation, QuotationStatus } from '../../types/crm';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
@@ -16,14 +16,13 @@ import {
   CheckCircle,
   Printer,
   Edit2,
-  Trash2,
   Send,
   Building2,
 } from 'lucide-react';
 
 export const QuotationsPage: React.FC = () => {
-  const { quotations, createQuotation, updateQuotationStatus, deleteQuotation, settings, isLoading } = useCrm();
-  const { user } = useAuth();
+  const { quotations, createQuotation, updateQuotationStatus, isLoading } = useCrm();
+  const location = useLocation();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -33,7 +32,17 @@ export const QuotationsPage: React.FC = () => {
   // Modals
   const [modalOpen, setModalOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
+  const [initialLeadId, setInitialLeadId] = useState<string | null>(null);
   const [previewQuote, setPreviewQuote] = useState<Quotation | null>(null);
+
+  // Auto-open modal if navigated from Enquiry / Lead page with leadId
+  useEffect(() => {
+    if (location.state && (location.state as { leadId?: string }).leadId) {
+      setInitialLeadId((location.state as { leadId: string }).leadId);
+      setEditingQuote(null);
+      setModalOpen(true);
+    }
+  }, [location.state]);
 
   // Filtered
   const filteredQuotations = useMemo(() => {
@@ -58,14 +67,352 @@ export const QuotationsPage: React.FC = () => {
     await updateQuotationStatus(id, status);
   };
 
-  const handleDelete = async (id: string, quoteNumber: string) => {
-    if (window.confirm(`Delete quotation ${quoteNumber}?`)) {
-      await deleteQuotation(id);
-    }
-  };
-
   const handlePrint = () => {
-    window.print();
+    if (!previewQuote) {
+      window.print();
+      return;
+    }
+
+    const quoteDisplayNumber = previewQuote.quoteNumber.startsWith('QT-')
+      ? previewQuote.quoteNumber.replace(/^QT-/, 'ZQ-')
+      : previewQuote.quoteNumber.startsWith('Q-')
+      ? previewQuote.quoteNumber.replace(/^Q-/, 'ZQ-')
+      : previewQuote.quoteNumber;
+
+    const formatDashOrPrice = (val: number | undefined | null) => {
+      if (val === undefined || val === null || val === 0) {
+        return '-';
+      }
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: val % 1 !== 0 ? 2 : 0,
+      }).format(val);
+    };
+
+    const formatUSDate = (dateStr: string) => {
+      if (!dateStr) return '';
+      try {
+        const parts = dateStr.split('-');
+        if (parts.length === 3 && parts[0].length === 4) {
+          return `${parts[1]}-${parts[2]}-${parts[0]}`;
+        }
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const year = d.getFullYear();
+          return `${month}-${day}-${year}`;
+        }
+      } catch (e) {}
+      return dateStr;
+    };
+
+    const calculateValidDays = (issueDateStr: string, validUntilStr: string) => {
+      if (!issueDateStr || !validUntilStr) return '30 days';
+      try {
+        const start = new Date(issueDateStr).getTime();
+        const end = new Date(validUntilStr).getTime();
+        const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+        if (diffDays > 0) return `${diffDays} days`;
+      } catch (e) {}
+      return '30 days';
+    };
+
+    const oneTimeSubtotal = previewQuote.lineItems.reduce((acc, item) => {
+      const oneTimeUnit = item.unitOneTime ?? (item.unitPrice && !item.unitMonthly ? item.unitPrice : 0);
+      const oneTimeTot = item.oneTimeTotal ?? (oneTimeUnit ? (item.quantity || 1) * oneTimeUnit : 0);
+      return acc + (oneTimeTot || 0);
+    }, 0);
+
+    const monthlySubtotal = previewQuote.lineItems.reduce((acc, item) => {
+      const monthlyUnit = item.unitMonthly ?? 0;
+      const monthlyTot = item.monthlyTotal ?? (monthlyUnit ? (item.quantity || 1) * monthlyUnit : 0);
+      return acc + (monthlyTot || 0);
+    }, 0);
+
+    const annualRecurring = monthlySubtotal * 12;
+    const year1Total = oneTimeSubtotal + annualRecurring;
+
+    const itemsRowsHtml = previewQuote.lineItems
+      .map(item => {
+        const oneTimeUnit = item.unitOneTime ?? (item.unitPrice && !item.unitMonthly ? item.unitPrice : 0);
+        const monthlyUnit = item.unitMonthly ?? 0;
+        const oneTimeTot = item.oneTimeTotal ?? (oneTimeUnit ? (item.quantity || 1) * oneTimeUnit : 0);
+        const monthlyTot = item.monthlyTotal ?? (monthlyUnit ? (item.quantity || 1) * monthlyUnit : 0);
+
+        return `
+          <tr>
+            <td style="padding: 5px 8px; border: 1px solid #94a3b8; font-weight: 500; color: #0f172a;">${item.description}</td>
+            <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: center; font-family: monospace; color: #0f172a;">${item.quantity}</td>
+            <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: right; font-family: monospace; color: #0f172a;">${formatDashOrPrice(oneTimeUnit)}</td>
+            <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: right; font-family: monospace; color: #0f172a;">${formatDashOrPrice(monthlyUnit)}</td>
+            <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: right; font-family: monospace; font-weight: 600; color: #0f172a;">${formatDashOrPrice(oneTimeTot)}</td>
+            <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: right; font-family: monospace; font-weight: 600; color: #0f172a;">${formatDashOrPrice(monthlyTot)}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${quoteDisplayNumber} - Quotation</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 8mm 12mm 8mm 12mm;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+              color: #0f172a;
+              background: #ffffff;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              font-size: 11px;
+              line-height: 1.35;
+              padding: 0;
+              margin: 0;
+            }
+            .container {
+              width: 100%;
+              max-width: 100%;
+              margin: 0;
+              padding: 0;
+            }
+            .header-flex {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 12px;
+            }
+            .logo-wrap {
+              display: flex;
+              flex-direction: column;
+            }
+            .logo-img {
+              height: 48px;
+              width: auto;
+              object-fit: contain;
+              margin-bottom: 4px;
+            }
+            .platform-label {
+              font-size: 12px;
+              font-weight: 500;
+              color: #1e293b;
+            }
+            .doc-heading {
+              font-size: 24px;
+              font-weight: 900;
+              color: #0b1b2d;
+              letter-spacing: 0.5px;
+              padding-top: 4px;
+            }
+            .meta-section {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              margin-bottom: 12px;
+              font-size: 12px;
+            }
+            .meta-left {
+              display: flex;
+              flex-direction: column;
+              gap: 3px;
+            }
+            .meta-row {
+              display: flex;
+              align-items: baseline;
+              gap: 8px;
+            }
+            .meta-title {
+              font-weight: 700;
+              color: #000;
+              min-width: 95px;
+            }
+            .meta-val-client {
+              color: #2563eb;
+              font-weight: 700;
+            }
+            .meta-right {
+              display: flex;
+              flex-direction: column;
+              align-items: flex-end;
+              gap: 4px;
+            }
+            .meta-badge-row {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .yellow-badge {
+              background-color: #fde047 !important;
+              color: #000 !important;
+              font-weight: 700;
+              padding: 2px 10px;
+              min-width: 90px;
+              text-align: center;
+              font-size: 11px;
+              display: inline-block;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              border: 1px solid #94a3b8;
+              font-size: 11px;
+              margin-bottom: 10px;
+              page-break-inside: auto;
+            }
+            tr {
+              page-break-inside: avoid;
+              page-break-after: auto;
+            }
+            thead tr {
+              background-color: #051329 !important;
+              color: #ffffff !important;
+            }
+            th {
+              padding: 6px 8px;
+              border: 1px solid #94a3b8;
+              font-weight: 700;
+              font-size: 11px;
+            }
+            .bg-summary {
+              background-color: #eaf1f8 !important;
+              font-weight: 700;
+              color: #0f172a;
+            }
+            .bg-year1 {
+              background-color: #eaf1f8 !important;
+              font-weight: 900;
+              color: #020617;
+            }
+            .notes {
+              margin-top: 10px;
+              font-size: 10px;
+              color: #475569;
+              font-style: italic;
+              line-height: 1.45;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header-flex">
+              <div class="logo-wrap">
+                <img class="logo-img" src="/zancompute-logo.png" alt="ZAN COMPUTE" />
+                <div class="platform-label">ZANI Facility Intelligence Platform</div>
+              </div>
+              <div class="doc-heading">QUOTATION</div>
+            </div>
+
+            <div class="meta-section">
+              <div class="meta-left">
+                <div class="meta-row">
+                  <span class="meta-title">Prepared for:</span>
+                  <span class="meta-val-client">${previewQuote.companyName || '[Client Name]'}</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-title">Quote #:</span>
+                  <span class="meta-val-client">${quoteDisplayNumber}</span>
+                </div>
+              </div>
+
+              <div class="meta-right">
+                <div class="meta-badge-row">
+                  <span class="meta-title" style="min-width: auto;">Date:</span>
+                  <span class="yellow-badge">${formatUSDate(previewQuote.issueDate)}</span>
+                </div>
+                <div class="meta-badge-row">
+                  <span class="meta-title" style="min-width: auto;">Valid for:</span>
+                  <span class="yellow-badge">${calculateValidDays(previewQuote.issueDate, previewQuote.validUntil)}</span>
+                </div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align: left;">Description</th>
+                  <th style="text-align: center; width: 45px;">Qty</th>
+                  <th style="text-align: right; width: 95px;">Unit One-Time</th>
+                  <th style="text-align: right; width: 95px;">Unit Monthly</th>
+                  <th style="text-align: right; width: 105px;">One-Time Total</th>
+                  <th style="text-align: right; width: 105px;">Monthly Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsRowsHtml}
+                <tr class="bg-summary">
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8; font-weight: 700;">Subtotal</td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: right; font-family: monospace; font-weight: 700;">${formatDashOrPrice(oneTimeSubtotal)}</td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: right; font-family: monospace; font-weight: 700;">${formatDashOrPrice(monthlySubtotal)}</td>
+                </tr>
+                <tr class="bg-summary">
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8; font-weight: 700;">Annual recurring (12 months)</td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: right; font-family: monospace; font-weight: 700;">${formatDashOrPrice(annualRecurring)}</td>
+                </tr>
+                <tr class="bg-year1">
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8; font-weight: 900;">Year 1 Total (one-time + 12 months recurring)</td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8;"></td>
+                  <td style="padding: 5px 8px; border: 1px solid #94a3b8; text-align: right; font-family: monospace; font-weight: 900;">${formatDashOrPrice(year1Total)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="notes">
+              <p>Pricing excludes applicable taxes. Recurring fees are billed monthly and include LTE connectivity, cloud hosting, and software updates.</p>
+              <p>One-time charges cover hardware, shipping, installation, and travel as itemized above. Quote valid for the period stated above.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Print using clean hidden iframe to prevent modal or parent styling from pushing down content
+    const printIframe = document.createElement('iframe');
+    printIframe.style.position = 'fixed';
+    printIframe.style.right = '0';
+    printIframe.style.bottom = '0';
+    printIframe.style.width = '0';
+    printIframe.style.height = '0';
+    printIframe.style.border = '0';
+    document.body.appendChild(printIframe);
+
+    const doc = printIframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+
+      setTimeout(() => {
+        printIframe.contentWindow?.focus();
+        printIframe.contentWindow?.print();
+        setTimeout(() => {
+          if (document.body.contains(printIframe)) {
+            document.body.removeChild(printIframe);
+          }
+        }, 1500);
+      }, 350);
+    }
   };
 
   const statusVariantMap: Record<QuotationStatus, 'slate' | 'blue' | 'green' | 'rose' | 'amber'> = {
@@ -79,20 +426,16 @@ export const QuotationsPage: React.FC = () => {
   const columns: Column<Quotation>[] = [
     {
       key: 'quoteNumber',
-      header: 'Quote # & Title',
+      header: 'Quote #',
       render: q => (
-        <div>
-          <div className="font-mono font-bold text-xs text-brand-600">{q.quoteNumber}</div>
-          <div className="font-bold text-slate-900 text-xs sm:text-sm mt-0.5">{q.title}</div>
-          {q.dealTitle && (
-            <div className="text-[11px] text-slate-400">Deal: {q.dealTitle}</div>
-          )}
-        </div>
+        <span className="font-mono font-bold text-xs sm:text-sm text-brand-600">
+          {q.quoteNumber}
+        </span>
       ),
     },
     {
       key: 'client',
-      header: 'Client Organization',
+      header: 'Company Name',
       render: q => (
         <div>
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
@@ -180,22 +523,15 @@ export const QuotationsPage: React.FC = () => {
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={() => handleDelete(q.id, q.quoteNumber)}
-            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
-            title="Delete Quote"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
         </div>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -207,7 +543,7 @@ export const QuotationsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -243,7 +579,7 @@ export const QuotationsPage: React.FC = () => {
       </div>
 
       {/* Filter and Search */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input
@@ -282,6 +618,7 @@ export const QuotationsPage: React.FC = () => {
           data={paginatedQuotations}
           keyExtractor={q => q.id}
           isLoading={isLoading}
+          noScroll={true}
           emptyMessage="No quotations recorded."
         />
 
@@ -297,8 +634,13 @@ export const QuotationsPage: React.FC = () => {
       {/* Quotation Create/Edit Modal */}
       <QuotationModalForm
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingQuote(null);
+          setInitialLeadId(null);
+        }}
         initialData={editingQuote}
+        initialLeadId={initialLeadId}
         onSubmit={async data => {
           await createQuotation(data);
         }}
@@ -309,123 +651,270 @@ export const QuotationsPage: React.FC = () => {
         <Modal
           isOpen={!!previewQuote}
           onClose={() => setPreviewQuote(null)}
-          title={`Commercial Quotation — ${previewQuote.quoteNumber}`}
-          subtitle="Client-facing document view and export layout"
-          maxWidth="3xl"
+          title={`Quotation Template — ${previewQuote.quoteNumber}`}
+          subtitle="Official ZanCompute Proposal & Agreement Layout"
+          maxWidth="4xl"
         >
-          <div className="p-6 bg-white border border-slate-200 rounded-2xl space-y-6">
-            {/* Header / Brand */}
-            <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-              <div>
-                <div className="flex items-center gap-2 text-brand-600 font-extrabold text-xl">
-                  <span>{settings?.companyName || 'Commercial Quotation'}</span>
-                </div>
-                {user?.email && <p className="text-xs text-slate-500 mt-1">{user.email}</p>}
-              </div>
+          {(() => {
+            const quoteDisplayNumber = previewQuote.quoteNumber.startsWith('QT-')
+              ? previewQuote.quoteNumber.replace(/^QT-/, 'ZQ-')
+              : previewQuote.quoteNumber.startsWith('Q-')
+              ? previewQuote.quoteNumber.replace(/^Q-/, 'ZQ-')
+              : previewQuote.quoteNumber;
 
-              <div className="text-right">
-                <span className="text-2xl font-black text-slate-900 font-mono">
-                  {previewQuote.quoteNumber}
-                </span>
-                <div className="mt-1">
-                  <Badge variant={statusVariantMap[previewQuote.status]} size="sm">
-                    {previewQuote.status}
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">Issue Date: {formatDate(previewQuote.issueDate)}</p>
-                <p className="text-xs text-slate-500">Valid Until: {formatDate(previewQuote.validUntil)}</p>
-              </div>
-            </div>
+            const formatDashOrPrice = (val: number | undefined | null) => {
+              if (val === undefined || val === null || val === 0) {
+                return '-';
+              }
+              return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: val % 1 !== 0 ? 2 : 0,
+              }).format(val);
+            };
 
-            {/* Client Info */}
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Prepared For:
-                </span>
-                <p className="font-extrabold text-slate-900 text-sm">{previewQuote.companyName}</p>
-                <p className="text-slate-600">{previewQuote.contactName}</p>
-                <p className="text-slate-600">{previewQuote.contactEmail}</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Prepared By:
-                </span>
-                <p className="font-extrabold text-slate-900 text-sm">{previewQuote.createdBy || user?.name || 'Sales Representative'}</p>
-                {previewQuote.dealTitle && (
-                  <p className="text-slate-600 mt-1 font-semibold">Deal: {previewQuote.dealTitle}</p>
-                )}
-              </div>
-            </div>
+            const formatUSDate = (dateStr: string) => {
+              if (!dateStr) return '';
+              try {
+                const parts = dateStr.split('-');
+                if (parts.length === 3 && parts[0].length === 4) {
+                  return `${parts[1]}-${parts[2]}-${parts[0]}`;
+                }
+                const d = new Date(dateStr);
+                if (!isNaN(d.getTime())) {
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const year = d.getFullYear();
+                  return `${month}-${day}-${year}`;
+                }
+              } catch (e) {}
+              return dateStr;
+            };
 
-            {/* Line Items Table */}
-            <div>
-              <table className="min-w-full divide-y divide-slate-200 text-xs">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
-                    <th className="py-2.5 px-3 text-left">Description</th>
-                    <th className="py-2.5 px-3 text-center">Qty</th>
-                    <th className="py-2.5 px-3 text-right">Unit Price</th>
-                    <th className="py-2.5 px-3 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {previewQuote.lineItems.map(item => (
-                    <tr key={item.id}>
-                      <td className="py-3 px-3 font-medium text-slate-800">{item.description}</td>
-                      <td className="py-3 px-3 text-center text-slate-600">{item.quantity}</td>
-                      <td className="py-3 px-3 text-right text-slate-600 font-mono">
-                        {formatCurrency(item.unitPrice)}
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-slate-900 font-mono">
-                        {formatCurrency(item.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            const calculateValidDays = (issueDateStr: string, validUntilStr: string) => {
+              if (!issueDateStr || !validUntilStr) return '30 days';
+              try {
+                const start = new Date(issueDateStr).getTime();
+                const end = new Date(validUntilStr).getTime();
+                const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+                if (diffDays > 0) return `${diffDays} days`;
+              } catch (e) {}
+              return '30 days';
+            };
 
-              {/* Totals Calculation */}
-              <div className="flex justify-end pt-4 border-t border-slate-200 text-xs">
-                <div className="w-64 space-y-1.5">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal:</span>
-                    <span className="font-semibold text-slate-800">{formatCurrency(previewQuote.subtotal)}</span>
+            const oneTimeSubtotal = previewQuote.lineItems.reduce((acc, item) => {
+              const oneTimeUnit = item.unitOneTime ?? (item.unitPrice && !item.unitMonthly ? item.unitPrice : 0);
+              const oneTimeTot = item.oneTimeTotal ?? (oneTimeUnit ? (item.quantity || 1) * oneTimeUnit : 0);
+              return acc + (oneTimeTot || 0);
+            }, 0);
+
+            const monthlySubtotal = previewQuote.lineItems.reduce((acc, item) => {
+              const monthlyUnit = item.unitMonthly ?? 0;
+              const monthlyTot = item.monthlyTotal ?? (monthlyUnit ? (item.quantity || 1) * monthlyUnit : 0);
+              return acc + (monthlyTot || 0);
+            }, 0);
+
+            const annualRecurring = monthlySubtotal * 12;
+            const year1Total = oneTimeSubtotal + annualRecurring;
+
+            return (
+              <div className="space-y-6">
+                {/* Printable Quotation Document Container */}
+                <div
+                  id="quotation-print-area"
+                  className="bg-white p-6 sm:p-10 rounded-xl border border-slate-200 shadow-sm space-y-6 text-slate-900"
+                >
+                  {/* Top Header: Logo + Platform Title (Left) and QUOTATION (Right) */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2">
+                      <img
+                        src="/zancompute-logo.png"
+                        alt="ZAN COMPUTE"
+                        className="h-14 sm:h-16 w-auto object-contain"
+                      />
+                      <p className="text-sm sm:text-base font-medium text-slate-800 tracking-tight">
+                        ZANI Facility Intelligence Platform
+                      </p>
+                    </div>
+
+                    <div className="text-right pt-2">
+                      <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-wider">
+                        QUOTATION
+                      </h1>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Tax ({previewQuote.taxRate}%):</span>
-                    <span>{formatCurrency(previewQuote.taxAmount)}</span>
+
+                  {/* Metadata Row: Prepared for & Quote # (Left) | Date & Valid for (Right) */}
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-4 border-t border-transparent">
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-bold text-slate-900 min-w-[110px]">Prepared for:</span>
+                        <span className="text-blue-600 font-bold">
+                          {previewQuote.companyName || '[Client Name]'}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-bold text-slate-900 min-w-[110px]">Quote #:</span>
+                        <span className="text-blue-600 font-bold">
+                          {quoteDisplayNumber}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 text-sm sm:text-right">
+                      <div className="flex sm:justify-end items-center gap-3">
+                        <span className="font-bold text-slate-900 min-w-[70px]">Date:</span>
+                        <span className="bg-yellow-300 font-bold px-3 py-0.5 text-slate-900 inline-block min-w-[110px] text-center">
+                          {formatUSDate(previewQuote.issueDate)}
+                        </span>
+                      </div>
+                      <div className="flex sm:justify-end items-center gap-3">
+                        <span className="font-bold text-slate-900 min-w-[70px]">Valid for:</span>
+                        <span className="bg-yellow-300 font-bold px-3 py-0.5 text-slate-900 inline-block min-w-[110px] text-center">
+                          {calculateValidDays(previewQuote.issueDate, previewQuote.validUntil)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm font-extrabold text-brand-700 pt-2 border-t border-slate-200">
-                    <span>Total Amount:</span>
-                    <span>{formatCurrency(previewQuote.total)}</span>
+
+                  {/* Line Items Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-slate-300 text-xs sm:text-sm">
+                      <thead>
+                        <tr className="bg-[#051329] text-white">
+                          <th className="border border-slate-300 px-3 py-2.5 text-left font-bold tracking-tight">
+                            Description
+                          </th>
+                          <th className="border border-slate-300 px-2 py-2.5 text-center font-bold tracking-tight w-16">
+                            Qty
+                          </th>
+                          <th className="border border-slate-300 px-3 py-2.5 text-right font-bold tracking-tight w-28">
+                            Unit One-Time
+                          </th>
+                          <th className="border border-slate-300 px-3 py-2.5 text-right font-bold tracking-tight w-28">
+                            Unit Monthly
+                          </th>
+                          <th className="border border-slate-300 px-3 py-2.5 text-right font-bold tracking-tight w-32">
+                            One-Time Total
+                          </th>
+                          <th className="border border-slate-300 px-3 py-2.5 text-right font-bold tracking-tight w-32">
+                            Monthly Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white">
+                        {previewQuote.lineItems.map((item, idx) => {
+                          const oneTimeUnit =
+                            item.unitOneTime ??
+                            (item.unitPrice && !item.unitMonthly ? item.unitPrice : 0);
+                          const monthlyUnit = item.unitMonthly ?? 0;
+                          const oneTimeTot =
+                            item.oneTimeTotal ??
+                            (oneTimeUnit ? (item.quantity || 1) * oneTimeUnit : 0);
+                          const monthlyTot =
+                            item.monthlyTotal ??
+                            (monthlyUnit ? (item.quantity || 1) * monthlyUnit : 0);
+
+                          return (
+                            <tr key={item.id || idx}>
+                              <td className="border border-slate-300 px-3 py-2 text-left text-slate-900 font-medium">
+                                {item.description}
+                              </td>
+                              <td className="border border-slate-300 px-2 py-2 text-center text-slate-900 font-mono">
+                                {item.quantity}
+                              </td>
+                              <td className="border border-slate-300 px-3 py-2 text-right text-slate-900 font-mono">
+                                {formatDashOrPrice(oneTimeUnit)}
+                              </td>
+                              <td className="border border-slate-300 px-3 py-2 text-right text-slate-900 font-mono">
+                                {formatDashOrPrice(monthlyUnit)}
+                              </td>
+                              <td className="border border-slate-300 px-3 py-2 text-right text-slate-900 font-mono font-medium">
+                                {formatDashOrPrice(oneTimeTot)}
+                              </td>
+                              <td className="border border-slate-300 px-3 py-2 text-right text-slate-900 font-mono font-medium">
+                                {formatDashOrPrice(monthlyTot)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {/* Subtotal row */}
+                        <tr className="bg-[#eaf1f8] font-bold text-slate-900">
+                          <td className="border border-slate-300 px-3 py-2 text-left font-bold">
+                            Subtotal
+                          </td>
+                          <td className="border border-slate-300 px-2 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2 text-right font-mono font-bold">
+                            {formatDashOrPrice(oneTimeSubtotal)}
+                          </td>
+                          <td className="border border-slate-300 px-3 py-2 text-right font-mono font-bold">
+                            {formatDashOrPrice(monthlySubtotal)}
+                          </td>
+                        </tr>
+
+                        {/* Annual recurring (12 months) row */}
+                        <tr className="bg-[#eaf1f8] font-bold text-slate-900">
+                          <td className="border border-slate-300 px-3 py-2 text-left font-bold">
+                            Annual recurring (12 months)
+                          </td>
+                          <td className="border border-slate-300 px-2 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2 text-right font-mono font-bold">
+                            {formatDashOrPrice(annualRecurring)}
+                          </td>
+                        </tr>
+
+                        {/* Year 1 Total row */}
+                        <tr className="bg-[#eaf1f8] font-black text-slate-900">
+                          <td className="border border-slate-300 px-3 py-2 text-left font-extrabold">
+                            Year 1 Total (one-time + 12 months recurring)
+                          </td>
+                          <td className="border border-slate-300 px-2 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2"></td>
+                          <td className="border border-slate-300 px-3 py-2 text-right font-mono font-black text-slate-950">
+                            {formatDashOrPrice(year1Total)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Footnotes & Disclaimers */}
+                  <div className="pt-2 space-y-1 text-[11px] sm:text-xs text-slate-600 italic">
+                    <p>
+                      Pricing excludes applicable taxes. Recurring fees are billed monthly and include LTE connectivity, cloud hosting, and software updates.
+                    </p>
+                    <p>
+                      One-time charges cover hardware, shipping, installation, and travel as itemized above. Quote valid for the period stated above.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Print and Actions Modal Controls (hidden during print) */}
+                <div className="no-print flex items-center justify-between pt-2">
+                  <div className="text-xs text-slate-500">
+                    Client: <span className="font-semibold text-slate-700">{previewQuote.companyName}</span> ({previewQuote.contactName})
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={handlePrint} icon={<Printer className="w-4 h-4" />}>
+                      Print / Save PDF
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={() => setPreviewQuote(null)}>
+                      Close Preview
+                    </Button>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Terms and notes */}
-            {(previewQuote.terms || previewQuote.notes) && (
-              <div className="text-xs text-slate-500 p-3 bg-slate-50 rounded-xl space-y-1">
-                {previewQuote.terms && (
-                  <p><span className="font-semibold text-slate-700">Terms:</span> {previewQuote.terms}</p>
-                )}
-                {previewQuote.notes && (
-                  <p><span className="font-semibold text-slate-700">Notes:</span> {previewQuote.notes}</p>
-                )}
-              </div>
-            )}
-
-            {/* Print and Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-              <Button variant="outline" size="sm" onClick={handlePrint} icon={<Printer className="w-4 h-4" />}>
-                Print / Save PDF
-              </Button>
-              <Button variant="primary" size="sm" onClick={() => setPreviewQuote(null)}>
-                Close Preview
-              </Button>
-            </div>
-          </div>
+            );
+          })()}
         </Modal>
       )}
     </div>

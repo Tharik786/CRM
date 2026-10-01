@@ -13,7 +13,10 @@ import {
   QuotationStatus,
   Installation,
   InstallerScheduleItem,
-  DeviceInventoryItem
+  DeviceInventoryItem,
+  ClientDeviceRequirement,
+  DeviceStockItem,
+  StockActionType,
 } from '../../types/crm';
 import { CrmStorage } from '../storage';
 
@@ -35,7 +38,6 @@ export const crmService = {
       name: resolvedName,
       email: email.trim(),
       role: existingUser?.role || 'admin',
-      avatar: existingUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedName)}&background=4f46e5&color=fff`,
       title: existingUser?.title || 'Administrator',
       phone: existingUser?.phone || '',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -46,6 +48,49 @@ export const crmService = {
     CrmStorage.setUser(user);
     CrmStorage.setToken(token);
     return { user, token };
+  },
+
+  async signup(
+    firstName: string,
+    lastName: string,
+    email: string,
+    _password?: string
+  ): Promise<{ user: User; token: string }> {
+    await delay(150);
+    if (!email || !email.includes('@')) {
+      throw new Error('Please enter a valid email address.');
+    }
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    if (!fullName) {
+      throw new Error('Please enter your full name.');
+    }
+
+    const user: User = {
+      id: `usr_${Date.now()}`,
+      name: fullName,
+      email: email.trim(),
+      role: 'admin',
+      title: 'Administrator',
+      phone: '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      notificationsEnabled: true,
+    };
+
+    const token = `zancrm_token_${Date.now()}`;
+    CrmStorage.setUser(user);
+    CrmStorage.setToken(token);
+    return { user, token };
+  },
+
+  async requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
+    await delay(150);
+    if (!email || !email.includes('@')) {
+      throw new Error('Please enter a valid email address.');
+    }
+    return {
+      success: true,
+      message: `Password reset link has been dispatched to ${email}. Please check your inbox.`,
+    };
   },
 
   async logout(): Promise<void> {
@@ -66,7 +111,6 @@ export const crmService = {
       name: data.name || current?.name || 'User',
       email: data.email || current?.email || '',
       role: data.role || current?.role || 'admin',
-      avatar: data.avatar || current?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || current?.name || 'User')}&background=4f46e5&color=fff`,
       title: data.title || current?.title || '',
       phone: data.phone || current?.phone || '',
       timezone: data.timezone || current?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -85,19 +129,19 @@ export const crmService = {
     const tasks = CrmStorage.getTasks();
     const activities = CrmStorage.getActivities();
 
-    const wonDeals = deals.filter(d => d.stage === 'closed_won');
-    const closedDeals = deals.filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost');
+    const wonDeals = deals.filter(d => d.stage === 'won');
+    const closedDeals = deals.filter(d => d.stage === 'won' || d.stage === 'lost');
 
     const totalRevenue = wonDeals.reduce((sum, d) => sum + d.value, 0);
     const pipelineValue = deals
-      .filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+      .filter(d => d.stage !== 'won' && d.stage !== 'lost' && d.stage !== 'cold')
       .reduce((sum, d) => sum + d.value, 0);
 
     const winRate = closedDeals.length > 0
       ? Math.round((wonDeals.length / closedDeals.length) * 100)
       : 0;
 
-    const stages: DealStage[] = ['qualification', 'needs_analysis', 'proposal_sent', 'negotiation', 'closed_won', 'closed_lost'];
+    const stages: DealStage[] = ['new', 'proposal', 'negotiation', 'won', 'lost', 'cold'];
     const stageBreakdown = stages.map(st => {
       const stageDeals = deals.filter(d => d.stage === st);
       return {
@@ -193,6 +237,7 @@ export const crmService = {
       title: 'Contact',
       companyName: lead.company,
       lifecycleStage: 'customer',
+      status: 'Won Client',
       lastActivityAt: new Date().toISOString(),
       assignedTo: lead.assignedTo || currentUser?.id || '',
       createdAt: new Date().toISOString(),
@@ -204,9 +249,9 @@ export const crmService = {
       id: `deal_${Date.now()}`,
       title: `${lead.company} - Opportunity`,
       value: lead.estimatedValue || 0,
-      currency: 'USD',
-      stage: 'qualification',
-      probability: 50,
+      currency: lead.currency || 'USD',
+      stage: 'new',
+      probability: 20,
       expectedCloseDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       companyName: lead.company,
       contactId: contact.id,
@@ -574,5 +619,72 @@ export const crmService = {
   async deleteDeviceInventoryItem(id: string): Promise<void> {
     await delay(60);
     CrmStorage.deleteDeviceInventory(id);
-  }
+  },
+
+  // === CLIENT REQUIREMENTS ===
+  async getClientRequirementsMap(): Promise<Record<string, ClientDeviceRequirement[]>> {
+    await delay(60);
+    return CrmStorage.getClientRequirementsMap();
+  },
+
+  async getClientRequirements(clientId: string): Promise<ClientDeviceRequirement[]> {
+    await delay(60);
+    return CrmStorage.getClientRequirements(clientId);
+  },
+
+  async saveClientRequirements(clientId: string, requirements: ClientDeviceRequirement[]): Promise<ClientDeviceRequirement[]> {
+    await delay(80);
+    const updated = CrmStorage.saveClientRequirements(clientId, requirements);
+    const currentUser = CrmStorage.getUser();
+    CrmStorage.addActivity({
+      id: `act_${Date.now()}`,
+      type: 'note',
+      title: 'Device Requirements Updated',
+      description: `Requirements updated for client ID ${clientId}.`,
+      performedBy: currentUser?.name || 'User',
+      performedById: currentUser?.id || '',
+      timestamp: new Date().toISOString(),
+      relatedToType: 'company',
+      relatedToId: clientId,
+    });
+    return updated;
+  },
+
+  async updateClientRequirement(clientId: string, deviceKey: string, required: number): Promise<ClientDeviceRequirement[]> {
+    await delay(60);
+    return CrmStorage.updateClientRequirement(clientId, deviceKey, required);
+  },
+
+  // === DEVICE STOCK INVENTORY ===
+  async getDeviceStock(): Promise<DeviceStockItem[]> {
+    await delay(60);
+    return CrmStorage.getDeviceStock();
+  },
+
+  async recordStockAction(
+    deviceKey: string,
+    action: StockActionType,
+    quantity: number
+  ): Promise<{ updatedItem: DeviceStockItem; allStock: DeviceStockItem[] }> {
+    await delay(80);
+    const result = CrmStorage.recordStockAction(deviceKey, action, quantity);
+    const currentUser = CrmStorage.getUser();
+    const actionLabel =
+      action === 'production_ready'
+        ? 'Production ready in India'
+        : action === 'shipped_to_us'
+          ? 'Shipped from India → US'
+          : 'Installed in client place';
+
+    CrmStorage.addActivity({
+      id: `act_${Date.now()}`,
+      type: 'note',
+      title: 'Stock Updated',
+      description: `${actionLabel}: ${quantity} units for ${result.updatedItem.deviceName}.`,
+      performedBy: currentUser?.name || 'User',
+      performedById: currentUser?.id || '',
+      timestamp: new Date().toISOString(),
+    });
+    return result;
+  },
 };

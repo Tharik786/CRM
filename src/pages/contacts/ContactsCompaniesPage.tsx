@@ -3,25 +3,20 @@ import { useCrm } from '../../context/CrmContext';
 import { Contact } from '../../types/crm';
 import { Button } from '../../components/common/Button';
 import { Table, Column, Pagination } from '../../components/common/Table';
-import { ContactModalForm } from '../../components/forms/ContactModalForm';
+import { ClientDetailsModal } from '../../components/clients/ClientDetailsModal';
 import { formatDate, exportToCSV } from '../../utils/formatters';
 import {
-  Plus,
   Search,
   Download,
   Mail,
   Phone,
   Building2,
-  Edit2,
-  Trash2,
+  Eye,
 } from 'lucide-react';
 
 export const ContactsCompaniesPage: React.FC = () => {
   const {
     contacts,
-    createContact,
-    updateContact,
-    deleteContact,
     isLoading,
   } = useCrm();
 
@@ -31,9 +26,9 @@ export const ContactsCompaniesPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  // Contact Modal
-  const [contactModalOpen, setContactModalOpen] = useState(false);
-  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  // Client Details Panel State
+  const [selectedClient, setSelectedClient] = useState<Contact | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   // Filtered Contacts
   const filteredContacts = useMemo(() => {
@@ -52,16 +47,9 @@ export const ContactsCompaniesPage: React.FC = () => {
     return filteredContacts.slice(start, start + itemsPerPage);
   }, [filteredContacts, currentPage]);
 
-  // Handlers for Contacts
-  const handleOpenContactModal = (c?: Contact) => {
-    setEditingContact(c || null);
-    setContactModalOpen(true);
-  };
-
-  const handleDeleteContact = async (id: string, name: string) => {
-    if (window.confirm(`Delete client profile for "${name}"?`)) {
-      await deleteContact(id);
-    }
+  const handleOpenDetails = (c: Contact) => {
+    setSelectedClient(c);
+    setDetailsOpen(true);
   };
 
   // Export
@@ -80,19 +68,14 @@ export const ContactsCompaniesPage: React.FC = () => {
       key: 'name',
       header: 'Client Name ',
       render: contact => (
-        <div className="flex items-center gap-3">
-          <img
-            src={
-              contact.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=6366f1&color=fff`
-            }
-            alt={contact.name}
-            className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
-          />
-          <div>
-            <div className="font-bold text-slate-900 text-xs sm:text-sm">{contact.name}</div>
-            <div className="text-xs text-slate-500">{contact.title || 'Decision Maker'}</div>
+        <div
+          className="cursor-pointer group"
+          onClick={() => handleOpenDetails(contact)}
+        >
+          <div className="font-bold text-slate-900 text-xs sm:text-sm group-hover:text-brand-600 transition-colors">
+            {contact.name}
           </div>
+          <div className="text-xs text-slate-500">{contact.title || 'Decision Maker'}</div>
         </div>
       ),
     },
@@ -112,14 +95,14 @@ export const ContactsCompaniesPage: React.FC = () => {
       render: contact => (
         <div className="text-xs space-y-0.5">
           <div className="flex items-center gap-1.5 text-slate-600">
-            <Mail className="w-3 h-3 text-slate-400" />
+            <Mail className="w-3.5 h-3.5 text-slate-400" />
             <a href={`mailto:${contact.email}`} className="hover:text-brand-600 truncate max-w-[160px]">
               {contact.email}
             </a>
           </div>
           {contact.phone && (
             <div className="flex items-center gap-1.5 text-slate-400">
-              <Phone className="w-3 h-3 text-slate-400" />
+              <Phone className="w-3.5 h-3.5 text-slate-400" />
               <span>{contact.phone}</span>
             </div>
           )}
@@ -140,16 +123,11 @@ export const ContactsCompaniesPage: React.FC = () => {
       render: contact => (
         <div className="flex items-center justify-end gap-1.5">
           <button
-            onClick={() => handleOpenContactModal(contact)}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+            onClick={() => handleOpenDetails(contact)}
+            className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+            title="View Client Details & Actions"
           >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => handleDeleteContact(contact.id, contact.name)}
-            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Eye className="w-3.5 h-3.5" />
           </button>
         </div>
       ),
@@ -157,9 +135,9 @@ export const ContactsCompaniesPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
             Clients Directory
@@ -169,7 +147,7 @@ export const ContactsCompaniesPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -178,20 +156,11 @@ export const ContactsCompaniesPage: React.FC = () => {
           >
             Export CSV
           </Button>
-
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => handleOpenContactModal()}
-            icon={<Plus className="w-4 h-4" />}
-          >
-            Add Client
-          </Button>
         </div>
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-subtle flex items-center justify-between gap-3">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-subtle flex items-center justify-between gap-2.5">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input
@@ -217,6 +186,7 @@ export const ContactsCompaniesPage: React.FC = () => {
           data={paginatedContacts}
           keyExtractor={c => c.id}
           isLoading={isLoading}
+          noScroll={true}
           emptyMessage="No clients found."
         />
 
@@ -229,18 +199,14 @@ export const ContactsCompaniesPage: React.FC = () => {
         />
       </div>
 
-      {/* Contact Form Modal */}
-      <ContactModalForm
-        isOpen={contactModalOpen}
-        onClose={() => setContactModalOpen(false)}
-        initialData={editingContact}
-        onSubmit={async data => {
-          if (editingContact) {
-            await updateContact(editingContact.id, data);
-          } else {
-            await createContact(data);
-          }
+      {/* Client Details Modal with 3 Sub-Modals */}
+      <ClientDetailsModal
+        isOpen={detailsOpen}
+        onClose={() => {
+          setDetailsOpen(false);
+          setSelectedClient(null);
         }}
+        client={selectedClient}
       />
     </div>
   );

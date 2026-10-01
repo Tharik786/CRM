@@ -121,12 +121,12 @@ export const DashboardPage: React.FC = () => {
     winRateChange: 0,
     pipelineValue: 0,
     stageBreakdown: [
-      { stage: 'qualification', count: 0, totalValue: 0 },
-      { stage: 'needs_analysis', count: 0, totalValue: 0 },
-      { stage: 'proposal_sent', count: 0, totalValue: 0 },
+      { stage: 'new', count: 0, totalValue: 0 },
+      { stage: 'proposal', count: 0, totalValue: 0 },
       { stage: 'negotiation', count: 0, totalValue: 0 },
-      { stage: 'closed_won', count: 0, totalValue: 0 },
-      { stage: 'closed_lost', count: 0, totalValue: 0 },
+      { stage: 'won', count: 0, totalValue: 0 },
+      { stage: 'lost', count: 0, totalValue: 0 },
+      { stage: 'cold', count: 0, totalValue: 0 },
     ],
     recentActivities: [],
     upcomingTasks: [],
@@ -135,7 +135,7 @@ export const DashboardPage: React.FC = () => {
   const activeMetrics = metrics || fallbackMetrics;
   const todayTasks = (tasks || []).slice(0, 5);
   const activeDealsCount = (activeMetrics.stageBreakdown || [])
-    .filter(s => s && s.stage !== 'closed_won' && s.stage !== 'closed_lost')
+    .filter(s => s && s.stage !== 'won' && s.stage !== 'lost')
     .reduce((acc, curr) => acc + (curr?.count || 0), 0);
 
   const getGreeting = () => {
@@ -158,19 +158,19 @@ export const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-5 animate-fade-in pb-12">
+    <div className="space-y-3.5 animate-fade-in pb-6">
       {/* Welcome Greeting Header */}
       <div>
         <span className="text-xs sm:text-sm font-medium text-slate-500 tracking-normal block">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
         </span>
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-1">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-0.5">
           {getGreeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
         </h1>
       </div>
 
       {/* KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Won Revenue */}
         <Card className="hover:border-brand-200">
           <CardBody className="p-5">
@@ -413,21 +413,21 @@ export const DashboardPage: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {(activeMetrics.stageBreakdown || []).map((item, idx) => {
               const stageLabels: Record<string, string> = {
-                qualification: 'New',
-                needs_analysis: 'Qualified',
-                proposal_sent: 'Proposal',
-                negotiation: 'Discussion',
-                closed_won: 'Won',
-                closed_lost: 'Lost',
+                new: '1. New',
+                proposal: '2. Proposal',
+                negotiation: '3. Negotiation',
+                won: '4. Won',
+                lost: '5. Lost',
+                cold: '6. Cold',
               };
 
               const colors = [
                 'border-blue-200 bg-blue-50/50 text-blue-700',
-                'border-indigo-200 bg-indigo-50/50 text-indigo-700',
                 'border-amber-200 bg-amber-50/50 text-amber-700',
                 'border-purple-200 bg-purple-50/50 text-purple-700',
                 'border-emerald-200 bg-emerald-50/50 text-emerald-700',
                 'border-rose-200 bg-rose-50/50 text-rose-700',
+                'border-slate-300 bg-slate-100 text-slate-700',
               ];
 
               return (

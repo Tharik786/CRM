@@ -1,12 +1,13 @@
 export function formatCurrency(amount: number, currency: string = 'USD'): string {
   try {
-    return new Intl.NumberFormat('en-US', {
+    const locale = currency === 'INR' ? 'en-IN' : 'en-US';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: currency || 'USD',
       maximumFractionDigits: 0,
     }).format(amount);
   } catch {
-    return `$${amount.toLocaleString()}`;
+    return currency === 'INR' ? `₹${amount.toLocaleString('en-IN')}` : `$${amount.toLocaleString()}`;
   }
 }
 

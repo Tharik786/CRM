@@ -1,17 +1,23 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-// import { useAuth } from '../context/AuthContext'; // Uncomment when re-enabling auth
+import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/layout/AppLayout';
-// import { LoadingSpinner } from '../components/common/EmptyState'; // Uncomment when re-enabling auth
+import { LoadingSpinner } from '../components/common/EmptyState';
 
 // Lazy or Direct Pages
-// import { LoginPage } from '../pages/auth/LoginPage'; // Uncomment when re-enabling login page
+import { LoginPage } from '../pages/auth/LoginPage';
+import { SignupPage } from '../pages/auth/SignupPage';
+import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { LeadsPage } from '../pages/leads/LeadsPage';
 import { DealsPipelinePage } from '../pages/deals/DealsPipelinePage';
 import { ContactsCompaniesPage } from '../pages/contacts/ContactsCompaniesPage';
+import { ClientRequirementsPage } from '../pages/requirements/ClientRequirementsPage';
+import { DeviceInventoryPage } from '../pages/inventory/DeviceInventoryPage';
 import { QuotationsPage } from '../pages/quotations/QuotationsPage';
 import { OperationsPage } from '../pages/operations/OperationsPage';
+import { InstallationsPage } from '../pages/operations/InstallationsPage';
+import { InstallerSchedulePage } from '../pages/operations/InstallerSchedulePage';
 import { TasksRemindersPage } from '../pages/tasks/TasksRemindersPage';
 import { ActivityTimelinePage } from '../pages/activities/ActivityTimelinePage';
 import { ReportsPage } from '../pages/reports/ReportsPage';
@@ -19,10 +25,6 @@ import { SettingsPage } from '../pages/settings/SettingsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  /*
-  // ========================================================
-  // [AUTH BYPASSED] Uncomment below to re-enable login check:
-  // ========================================================
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -36,15 +38,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  */
 
   return <>{children}</>;
 };
 
-/*
-// ========================================================
-// [AUTH BYPASSED] Uncomment below when re-enabling login:
-// ========================================================
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -62,18 +59,11 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return <>{children}</>;
 };
-*/
 
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      {/* 
-        ========================================================
-        Public Auth Routes (Commented out to bypass login page)
-        Uncomment when ready to restore login page route:
-        ========================================================
-      */}
-      {/*
+      {/* Public Auth Routes */}
       <Route
         path="/login"
         element={
@@ -82,9 +72,30 @@ export const AppRoutes: React.FC = () => {
           </PublicRoute>
         }
       />
-      */}
-      {/* Direct redirect from /login to /dashboard while login is disabled */}
-      <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+      <Route
+        path="/signup"
+        element={
+          <PublicRoute>
+            <SignupPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/register"
+        element={<Navigate to="/signup" replace />}
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPasswordPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={<Navigate to="/forgot-password" replace />}
+      />
 
       {/* Protected CRM Workspaces */}
       <Route
@@ -100,8 +111,18 @@ export const AppRoutes: React.FC = () => {
         <Route path="leads" element={<LeadsPage />} />
         <Route path="deals" element={<DealsPipelinePage />} />
         <Route path="contacts" element={<ContactsCompaniesPage />} />
+        <Route path="client-requirements" element={<ClientRequirementsPage />} />
+        <Route path="requirements" element={<Navigate to="/client-requirements" replace />} />
+        <Route path="inventory" element={<DeviceInventoryPage />} />
+        <Route path="device-inventory" element={<Navigate to="/inventory" replace />} />
         <Route path="quotations" element={<QuotationsPage />} />
         <Route path="operations" element={<OperationsPage />} />
+        <Route path="installations" element={<InstallationsPage />} />
+        <Route path="operations/installations" element={<Navigate to="/installations" replace />} />
+        <Route path="installer-schedule" element={<InstallerSchedulePage />} />
+        <Route path="installation-scheduler" element={<Navigate to="/installer-schedule" replace />} />
+        <Route path="schedule" element={<Navigate to="/installer-schedule" replace />} />
+        <Route path="operations/schedule" element={<Navigate to="/installer-schedule" replace />} />
         <Route path="tasks" element={<TasksRemindersPage />} />
         <Route path="activities" element={<ActivityTimelinePage />} />
         <Route path="reports" element={<ReportsPage />} />

@@ -11,16 +11,14 @@ import {
   Search,
   ArrowRightLeft,
   Edit2,
-  Trash2,
   Download,
   Mail,
   Phone,
   Building2,
-  CheckCircle,
 } from 'lucide-react';
 
 export const LeadsPage: React.FC = () => {
-  const { leads, createLead, updateLead, deleteLead, convertLead, isLoading } = useCrm();
+  const { leads, createLead, updateLead, convertLead, isLoading } = useCrm();
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,12 +67,6 @@ export const LeadsPage: React.FC = () => {
   const handleOpenEdit = (lead: Lead) => {
     setEditingLead(lead);
     setModalOpen(true);
-  };
-
-  const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete lead "${name}"?`)) {
-      await deleteLead(id);
-    }
   };
 
   const handleConvert = async (lead: Lead) => {
@@ -129,17 +121,13 @@ export const LeadsPage: React.FC = () => {
     {
       key: 'name',
       header: 'Lead Name & Company',
+      className: 'w-[25%]',
       render: lead => (
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-brand-100 to-indigo-100 text-brand-700 font-bold flex items-center justify-center shrink-0 border border-brand-200/60">
-            {lead.name.charAt(0)}
-          </div>
-          <div>
-            <div className="font-bold text-slate-900 text-xs sm:text-sm">{lead.name}</div>
-            <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-              <Building2 className="w-3 h-3 text-slate-400" />
-              <span>{lead.company}</span>
-            </div>
+        <div className="min-w-0 pr-2">
+          <div className="font-bold text-slate-900 text-xs sm:text-sm truncate">{lead.name}</div>
+          <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="truncate">{lead.company}</span>
           </div>
         </div>
       ),
@@ -147,36 +135,42 @@ export const LeadsPage: React.FC = () => {
     {
       key: 'contact',
       header: 'Contact Info',
+      className: 'w-[25%]',
       render: lead => (
-        <div className="text-xs space-y-0.5">
-          <div className="flex items-center gap-1.5 text-slate-600">
-            <Mail className="w-3 h-3 text-slate-400" />
-            <a href={`mailto:${lead.email}`} className="hover:text-brand-600 truncate max-w-[160px]">
+        <div className="text-xs space-y-0.5 min-w-0 pr-2">
+          <div className="flex items-center gap-1.5 text-slate-600 truncate">
+            <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <a
+              href={`mailto:${lead.email}`}
+              className="hover:text-brand-600 transition-colors truncate"
+              title={lead.email}
+            >
               {lead.email}
             </a>
           </div>
           {lead.phone && (
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Phone className="w-3 h-3 text-slate-400" />
-              <span>{lead.phone}</span>
+            <div className="flex items-center gap-1.5 text-slate-400 truncate">
+              <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="truncate">{lead.phone}</span>
             </div>
           )}
         </div>
       ),
     },
-
     {
       key: 'estimatedValue',
       header: 'Est. Value',
+      className: 'w-[12%] whitespace-nowrap',
       render: lead => (
         <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm">
-          {formatCurrency(lead.estimatedValue)}
+          {formatCurrency(lead.estimatedValue, lead.currency || 'USD')}
         </span>
       ),
     },
     {
       key: 'status',
       header: 'Status',
+      className: 'w-[11%] whitespace-nowrap',
       render: lead => (
         <Badge variant={statusVariantMap[lead.status] || 'slate'} size="sm">
           {statusLabelMap[lead.status] || lead.status}
@@ -186,6 +180,7 @@ export const LeadsPage: React.FC = () => {
     {
       key: 'source',
       header: 'Source',
+      className: 'w-[12%] whitespace-nowrap',
       render: lead => {
         const sourceLabelMap: Record<LeadSource, string> = {
           website: 'Website Inbound',
@@ -196,7 +191,7 @@ export const LeadsPage: React.FC = () => {
           cold_outreach: 'Cold Outreach',
         };
         return (
-          <span className="text-xs text-slate-600 font-medium">
+          <span className="text-xs text-slate-600 font-medium truncate block">
             {sourceLabelMap[lead.source] || lead.source}
           </span>
         );
@@ -205,10 +200,10 @@ export const LeadsPage: React.FC = () => {
     {
       key: 'actions',
       header: 'Actions',
-      className: 'text-right',
+      className: 'w-[15%] whitespace-nowrap text-right',
       render: lead => (
-        <div className="flex items-center justify-end gap-1.5">
-          {lead.status !== 'converted' ? (
+        <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+          {lead.status !== 'converted' && (
             <Button
               variant="outline"
               size="xs"
@@ -222,10 +217,6 @@ export const LeadsPage: React.FC = () => {
             >
               Client
             </Button>
-          ) : (
-            <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 px-2 py-0.5 bg-emerald-50 rounded">
-              <CheckCircle className="w-3 h-3" /> Client
-            </span>
           )}
 
           <button
@@ -238,26 +229,15 @@ export const LeadsPage: React.FC = () => {
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
-
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              handleDelete(lead.id, lead.name);
-            }}
-            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-            title="Delete Enquiry"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
         </div>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -269,7 +249,7 @@ export const LeadsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -290,7 +270,7 @@ export const LeadsPage: React.FC = () => {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-2.5">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input
@@ -301,18 +281,18 @@ export const LeadsPage: React.FC = () => {
               setCurrentPage(1);
             }}
             placeholder="Filter enquiries by name, company, email..."
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={statusFilter}
             onChange={e => {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           >
             <option value="all">All Statuses</option>
             <option value="new">1. New</option>
@@ -329,7 +309,7 @@ export const LeadsPage: React.FC = () => {
               setSourceFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           >
             <option value="all">All Sources</option>
             <option value="website">Website Inbound</option>
@@ -342,7 +322,7 @@ export const LeadsPage: React.FC = () => {
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value as 'value' | 'date')}
-            className="text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           >
             <option value="date">Sort by Recent</option>
             <option value="value">Sort by Est. Value</option>
@@ -357,6 +337,7 @@ export const LeadsPage: React.FC = () => {
           data={paginatedLeads}
           keyExtractor={lead => lead.id}
           isLoading={isLoading}
+          noScroll={true}
           emptyMessage="No enquiries match your selected filters."
         />
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Lock, Mail } from 'lucide-react';
 import { Button } from '../../components/common/Button';
@@ -40,8 +40,8 @@ export const LoginPage: React.FC = () => {
       <div className="absolute top-0 -left-40 w-96 h-96 bg-brand-600/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 -right-40 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="bg-slate-800/80 border border-slate-700/80 backdrop-blur-xl py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
+      <div className="sm:mx-auto sm:w-full sm:max-w-lg relative z-10">
+        <div className="bg-slate-800/80 border border-slate-700/80 backdrop-blur-xl py-8 px-6 shadow-2xl rounded-2xl sm:px-8">
           {/* Brand Logo & Title */}
           <div className="flex justify-center items-center gap-3 mb-6">
             <img
@@ -62,7 +62,7 @@ export const LoginPage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                 Email 
+                Email
               </label>
               <div className="relative rounded-lg shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -109,13 +109,12 @@ export const LoginPage: React.FC = () => {
                 <span className="ml-2 font-medium">Keep me signed in</span>
               </label>
 
-              <button
-                type="button"
-                onClick={() => alert('Password reset instructions will be sent to your administrator.')}
-                className="text-brand-400 hover:text-brand-300 font-semibold"
+              <Link
+                to="/forgot-password"
+                className="text-brand-400 hover:text-brand-300 font-semibold transition-colors"
               >
                 Forgot password?
-              </button>
+              </Link>
             </div>
 
             <div className="pt-2">
@@ -130,6 +129,18 @@ export const LoginPage: React.FC = () => {
               </Button>
             </div>
           </form>
+
+          <div className="mt-6 pt-5 border-t border-slate-700/60 text-center">
+            <p className="text-xs text-slate-400">
+              Don't have an account?{' '}
+              <Link
+                to="/signup"
+                className="text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+              >
+                Sign up
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

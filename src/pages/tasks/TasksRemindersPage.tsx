@@ -18,11 +18,10 @@ import {
   Calendar,
   AlertCircle,
   Edit2,
-  Trash2,
 } from 'lucide-react';
 
 export const TasksRemindersPage: React.FC = () => {
-  const { tasks, createTask, toggleTask, deleteTask } = useCrm();
+  const { tasks, createTask, toggleTask } = useCrm();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'today' | 'upcoming' | 'completed'>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -58,12 +57,6 @@ export const TasksRemindersPage: React.FC = () => {
     await toggleTask(id);
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (window.confirm(`Delete task "${title}"?`)) {
-      await deleteTask(id);
-    }
-  };
-
   const priorityVariantMap: Record<TaskPriority, 'rose' | 'amber' | 'green' | 'slate'> = {
     urgent: 'rose',
     high: 'rose',
@@ -81,9 +74,9 @@ export const TasksRemindersPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -95,7 +88,7 @@ export const TasksRemindersPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -130,7 +123,7 @@ export const TasksRemindersPage: React.FC = () => {
       </div>
 
       {/* Filter Tabs and Controls */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-2.5">
         {/* Filter Badges */}
         <div className="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200 w-fit">
           <button
@@ -284,13 +277,6 @@ export const TasksRemindersPage: React.FC = () => {
                   title="Edit Task"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => handleDelete(task.id, task.title)}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
-                  title="Delete Task"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

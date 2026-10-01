@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Deal, DealStage } from '../../types/crm';
+import { Deal, DealStage, CurrencyType } from '../../types/crm';
 import { Modal } from '../common/Modal';
 import { Input, Select } from '../common/Input';
 import { Button } from '../common/Button';
@@ -20,8 +20,9 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
 }) => {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
-  const [value, setValue] = useState(0);
-  const [stage, setStage] = useState<DealStage>('qualification');
+  const [currency, setCurrency] = useState<CurrencyType>('USD');
+  const [value, setValue] = useState<number | ''>('');
+  const [stage, setStage] = useState<DealStage>('new');
   const [probability, setProbability] = useState(50);
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
@@ -30,30 +31,36 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
   );
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [tagsInput, setTagsInput] = useState('');
+  const [lostReason, setLostReason] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (initialData) {
-      setTitle(initialData.title);
-      setValue(initialData.value);
-      setStage(initialData.stage);
-      setProbability(initialData.probability);
-      setCompanyName(initialData.companyName);
-      setContactName(initialData.contactName);
-      setExpectedCloseDate(initialData.expectedCloseDate);
-      setPriority(initialData.priority);
+    if (initialData && initialData.id) {
+      setTitle(initialData.title || '');
+      setCurrency((initialData.currency as CurrencyType) || 'USD');
+      setValue(initialData.value || '');
+      setStage(initialData.stage || 'new');
+      setProbability(initialData.probability ?? (initialData.stage === 'lost' ? 0 : 50));
+      setCompanyName(initialData.companyName || '');
+      setContactName(initialData.contactName || '');
+      setExpectedCloseDate(initialData.expectedCloseDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+      setPriority(initialData.priority || 'medium');
       setTagsInput(initialData.tags?.join(', ') || '');
+      setLostReason(initialData.lostReason || '');
     } else {
+      const defaultStage = (initialData && initialData.stage) ? initialData.stage : 'new';
       setTitle('');
-      setValue(0);
-      setStage('qualification');
-      setProbability(50);
+      setCurrency('USD');
+      setValue('');
+      setStage(defaultStage);
+      setProbability(defaultStage === 'lost' ? 0 : defaultStage === 'won' ? 100 : 50);
       setCompanyName('');
       setContactName('');
       setExpectedCloseDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       setPriority('medium');
       setTagsInput('');
+      setLostReason('');
     }
     setErrors({});
   }, [initialData, isOpen]);
@@ -62,8 +69,11 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
     const errs: Record<string, string> = {};
     if (!title.trim()) errs.title = 'Deal title is required';
     if (!companyName.trim()) errs.companyName = 'Company name is required';
-    if (value <= 0) errs.value = 'Deal value must be greater than $0';
+    if (value === '' || Number(value) <= 0) errs.value = 'Deal value must be greater than 0';
     if (!expectedCloseDate) errs.expectedCloseDate = 'Close date is required';
+    if (stage === 'lost' && !lostReason.trim()) {
+      errs.lostReason = 'Please enter the reason for lost deal';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -81,8 +91,8 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
 
       await onSubmit({
         title,
-        value: Number(value),
-        currency: 'USD',
+        value: Number(value) || 0,
+        currency,
         stage,
         probability: Number(probability),
         expectedCloseDate,
@@ -91,6 +101,7 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
         assignedTo: initialData?.assignedTo || user?.id || 'usr_current',
         priority,
         tags,
+        lostReason: stage === 'lost' ? lostReason.trim() : undefined,
       });
       onClose();
     } finally {
@@ -133,25 +144,42 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Deal Amount ($ USD)"
-            type="number"
-            min="1"
-            step="1000"
-            value={value}
-            onChange={e => setValue(Number(e.target.value))}
-            error={errors.value}
-            required
-          />
-          <Input
-            label="Expected Close Date"
-            type="date"
-            value={expectedCloseDate}
-            onChange={e => setExpectedCloseDate(e.target.value)}
-            error={errors.expectedCloseDate}
-            required
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <Select
+              label="Currency"
+              value={currency}
+              onChange={e => setCurrency(e.target.value as CurrencyType)}
+              options={[
+                { value: 'USD', label: '$ USD (Dollar)' },
+                { value: 'INR', label: '₹ INR (Rupee)' },
+              ]}
+            />
+          </div>
+          <div>
+            <Input
+              label={`Deal Amount (${currency === 'INR' ? '₹ INR' : '$ USD'})`}
+              type="number"
+              min="0"
+              step="any"
+              placeholder="e.g. 50000"
+              value={value}
+              onChange={e => setValue(e.target.value === '' ? '' : Number(e.target.value))}
+              error={errors.value}
+              required
+            />
+          </div>
+          <div>
+            <Input
+              label="Expected Close Date"
+              type="date"
+              max="2099-12-31"
+              value={expectedCloseDate}
+              onChange={e => setExpectedCloseDate(e.target.value)}
+              error={errors.expectedCloseDate}
+              required
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -162,20 +190,20 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
               const newStage = e.target.value as DealStage;
               setStage(newStage);
               // auto adjust default probability
-              if (newStage === 'qualification') setProbability(20);
-              if (newStage === 'needs_analysis') setProbability(40);
-              if (newStage === 'proposal_sent') setProbability(60);
+              if (newStage === 'new') setProbability(20);
+              if (newStage === 'proposal') setProbability(50);
               if (newStage === 'negotiation') setProbability(80);
-              if (newStage === 'closed_won') setProbability(100);
-              if (newStage === 'closed_lost') setProbability(0);
+              if (newStage === 'won') setProbability(100);
+              if (newStage === 'lost') setProbability(0);
+              if (newStage === 'cold') setProbability(10);
             }}
             options={[
-              { value: 'qualification', label: '1. New' },
-              { value: 'needs_analysis', label: '2. Qualified' },
-              { value: 'proposal_sent', label: '3. Proposal' },
-              { value: 'negotiation', label: '4. Discussion' },
-              { value: 'closed_won', label: '5. Won' },
-              { value: 'closed_lost', label: '6. Lost' },
+              { value: 'new', label: '1. New' },
+              { value: 'proposal', label: '2. Proposal' },
+              { value: 'negotiation', label: '3. Negotiation' },
+              { value: 'won', label: '4. Won' },
+              { value: 'lost', label: '5. Lost' },
+              { value: 'cold', label: '6. Cold' },
             ]}
           />
           <Select
@@ -190,6 +218,21 @@ export const DealModalForm: React.FC<DealModalFormProps> = ({
           />
         </div>
 
+        {stage === 'lost' && (
+          <Input
+            label="Reason for Lost Deal"
+            placeholder="e.g. Budget constraints, chosen competitor, project postponed..."
+            value={lostReason}
+            onChange={e => {
+              setLostReason(e.target.value);
+              if (errors.lostReason) {
+                setErrors(prev => ({ ...prev, lostReason: '' }));
+              }
+            }}
+            error={errors.lostReason}
+            required
+          />
+        )}
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lead, LeadSource, LeadStatus } from '../../types/crm';
+import { Lead, LeadSource, LeadStatus, CurrencyType } from '../../types/crm';
 import { Modal } from '../common/Modal';
 import { Input, Select } from '../common/Input';
 import { Button } from '../common/Button';
@@ -26,7 +26,8 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
   const [source, setSource] = useState<LeadSource>('website');
   const [status, setStatus] = useState<LeadStatus>('new');
   const [score, setScore] = useState(50);
-  const [estimatedValue, setEstimatedValue] = useState(0);
+  const [currency, setCurrency] = useState<CurrencyType>('USD');
+  const [estimatedValue, setEstimatedValue] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,7 +41,8 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
       setSource(initialData.source);
       setStatus(initialData.status);
       setScore(initialData.score);
-      setEstimatedValue(initialData.estimatedValue);
+      setCurrency(initialData.currency || 'USD');
+      setEstimatedValue(initialData.estimatedValue || '');
       setNotes(initialData.notes || '');
     } else {
       setName('');
@@ -50,7 +52,8 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
       setSource('website');
       setStatus('new');
       setScore(50);
-      setEstimatedValue(0);
+      setCurrency('USD');
+      setEstimatedValue('');
       setNotes('');
     }
     setErrors({});
@@ -65,7 +68,9 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       errs.email = 'Please provide a valid email format';
     }
-    if (estimatedValue < 0) errs.estimatedValue = 'Value cannot be negative';
+    if (typeof estimatedValue === 'number' && estimatedValue < 0) {
+      errs.estimatedValue = 'Value cannot be negative';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -84,7 +89,8 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
         source,
         status,
         score: Number(score),
-        estimatedValue: Number(estimatedValue),
+        estimatedValue: estimatedValue === '' ? 0 : Number(estimatedValue),
+        currency,
         assignedTo: initialData?.assignedTo || user?.id || 'usr_current',
         notes,
       });
@@ -168,16 +174,30 @@ export const LeadModalForm: React.FC<LeadModalFormProps> = ({
           />
         </div>
 
-        <div>
-          <Input
-            label="Estimated Deal Value ($)"
-            type="number"
-            min="0"
-            step="1000"
-            value={estimatedValue}
-            onChange={e => setEstimatedValue(Number(e.target.value))}
-            error={errors.estimatedValue}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="sm:col-span-1">
+            <Select
+              label="Currency"
+              value={currency}
+              onChange={e => setCurrency(e.target.value as CurrencyType)}
+              options={[
+                { value: 'USD', label: '$ USD (Dollar)' },
+                { value: 'INR', label: '₹ INR (Rupee)' },
+              ]}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Input
+              label={`Estimated Deal Value (${currency === 'INR' ? '₹ INR' : '$ USD'})`}
+              type="number"
+              min="0"
+              step="any"
+              placeholder="e.g. 50000"
+              value={estimatedValue}
+              onChange={e => setEstimatedValue(e.target.value === '' ? '' : Number(e.target.value))}
+              error={errors.estimatedValue}
+            />
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">

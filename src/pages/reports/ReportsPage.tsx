@@ -17,9 +17,9 @@ export const ReportsPage: React.FC = () => {
   const [timeframe, setTimeframe] = useState<'q3' | 'ytd' | 'all'>('ytd');
 
   // Revenue totals
-  const wonDeals = deals.filter(d => d.stage === 'closed_won');
-  const lostDeals = deals.filter(d => d.stage === 'closed_lost');
-  const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
+  const wonDeals = deals.filter(d => d.stage === 'won');
+  const lostDeals = deals.filter(d => d.stage === 'lost');
+  const activeDeals = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost' && d.stage !== 'cold');
 
   const totalWonRevenue = wonDeals.reduce((sum, d) => sum + d.value, 0);
   const pipelineRevenue = activeDeals.reduce((sum, d) => sum + d.value, 0);
@@ -62,13 +62,12 @@ export const ReportsPage: React.FC = () => {
     role: user?.title || 'Account Executive',
     dealsWon: data.dealsWon,
     revenueClosed: data.revenue,
-    avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff`,
   }));
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="space-y-3.5 animate-fade-in pb-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -80,11 +79,11 @@ export const ReportsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <select
             value={timeframe}
             onChange={e => setTimeframe(e.target.value as 'q3' | 'ytd' | 'all')}
-            className="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-700 font-medium"
+            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 font-medium"
           >
             <option value="q3">Current Quarter</option>
             <option value="ytd">Year to Date (YTD)</option>
@@ -103,9 +102,9 @@ export const ReportsPage: React.FC = () => {
       </div>
 
       {/* High-level KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
-          <CardBody className="p-5">
+          <CardBody className="p-4 sm:p-4.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
               Revenue
             </span>
@@ -297,11 +296,6 @@ export const ReportsPage: React.FC = () => {
                     <span className="font-mono font-black text-slate-400 text-sm w-4">
                       #{idx + 1}
                     </span>
-                    <img
-                      src={rep.avatar}
-                      alt={rep.name}
-                      className="w-10 h-10 rounded-full object-cover ring-2 ring-slate-100"
-                    />
                     <div>
                       <h4 className="font-bold text-slate-900 text-sm">{rep.name}</h4>
                       <p className="text-xs text-slate-500">{rep.role}</p>

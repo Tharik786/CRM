@@ -8,6 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password?: string) => Promise<void>;
+  signup: (firstName: string, lastName: string, email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
 }
@@ -26,8 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const currentUser = await crmService.getCurrentUser();
           setUser(currentUser);
         } else {
-          const currentUser = await crmService.getCurrentUser();
-          setUser(currentUser);
+          setUser(null);
         }
       } catch (err) {
         console.error('Failed to load user session:', err);
@@ -44,6 +44,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const res = await crmService.login(email, password);
+      setUser(res.user);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signup = async (firstName: string, lastName: string, email: string, password?: string) => {
+    setIsLoading(true);
+    try {
+      const res = await crmService.signup(firstName, lastName, email, password);
       setUser(res.user);
     } finally {
       setIsLoading(false);
@@ -72,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isLoading,
         login,
+        signup,
         logout,
         updateProfile,
       }}

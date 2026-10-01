@@ -12,7 +12,10 @@ import {
   QuotationStatus,
   Installation,
   InstallerScheduleItem,
-  DeviceInventoryItem
+  DeviceInventoryItem,
+  ClientDeviceRequirement,
+  DeviceStockItem,
+  StockActionType,
 } from '../types/crm';
 import { crmService } from '../api/services/crmService';
 import { CrmStorage } from '../api/storage';
@@ -96,6 +99,17 @@ interface CrmContextType {
   updateDeviceInventoryItem: (id: string, data: Partial<DeviceInventoryItem>) => Promise<DeviceInventoryItem>;
   deleteDeviceInventoryItem: (id: string) => Promise<void>;
 
+  // Client Requirements
+  clientRequirements: Record<string, ClientDeviceRequirement[]>;
+  getClientRequirements: (clientId: string) => Promise<ClientDeviceRequirement[]>;
+  saveClientRequirements: (clientId: string, requirements: ClientDeviceRequirement[]) => Promise<ClientDeviceRequirement[]>;
+  updateClientRequirement: (clientId: string, deviceKey: string, required: number) => Promise<void>;
+
+  // Device Stock Inventory
+  deviceStock: DeviceStockItem[];
+  recordStockAction: (deviceKey: string, action: StockActionType, quantity: number) => Promise<DeviceStockItem>;
+  refreshDeviceStock: () => Promise<void>;
+
   // Toast
   toasts: ToastMessage[];
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
@@ -116,6 +130,8 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [installerSchedules, setInstallerSchedules] = useState<InstallerScheduleItem[]>([]);
   const [deviceInventory, setDeviceInventory] = useState<DeviceInventoryItem[]>([]);
+  const [deviceStock, setDeviceStock] = useState<DeviceStockItem[]>([]);
+  const [clientRequirements, setClientRequirements] = useState<Record<string, ClientDeviceRequirement[]>>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -146,6 +162,8 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetchedInst,
         fetchedSch,
         fetchedDev,
+        fetchedReqs,
+        fetchedStock,
       ] = await Promise.all([
         crmService.getLeads(),
         crmService.getDeals(),
@@ -158,6 +176,8 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         crmService.getInstallations(),
         crmService.getInstallerSchedules(),
         crmService.getDeviceInventory(),
+        crmService.getClientRequirementsMap(),
+        crmService.getDeviceStock(),
       ]);
 
       setLeads(fetchedLeads);
@@ -171,6 +191,8 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setInstallations(fetchedInst);
       setInstallerSchedules(fetchedSch);
       setDeviceInventory(fetchedDev);
+      setClientRequirements(fetchedReqs);
+      setDeviceStock(fetchedStock);
     } catch (err) {
       console.error('Error fetching CRM data:', err);
       addToast({
@@ -226,7 +248,7 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const res = await crmService.createDeal(dealData);
     setDeals(prev => [res, ...prev]);
     addToast({ type: 'success', title: 'Deal Created', message: `Deal "${res.title}" added to pipeline.` });
-    refreshAll();
+    await refreshAll();
     return res;
   };
 
@@ -243,11 +265,34 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await crmService.updateDealStage(id, stage);
       setDeals(prev => prev.map(d => (d.id === id ? res : d)));
+
+      // Auto create client when deal reaches 'won'
+      if (stage === 'won') {
+        const existing = contacts.find(
+          c => c.companyName.toLowerCase() === res.companyName.toLowerCase()
+        );
+        if (!existing) {
+          await crmService.createContact({
+            name: res.contactName || res.title,
+            email: `contact@${res.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
+            phone: '',
+            title: 'Key Client Stakeholder',
+            companyName: res.companyName,
+            status: 'Won Client',
+            lifecycleStage: 'customer',
+            assignedTo: res.assignedTo || 'usr_current',
+          });
+        }
+      }
+
+
+
       addToast({
         type: 'success',
         title: 'Stage Shifted',
         message: `Deal moved to ${stage.replace('_', ' ').toUpperCase()}`,
       });
+      await refreshAll();
       return res;
     } catch (err) {
       await refreshAll();
@@ -439,6 +484,56 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast({ type: 'info', title: 'Device Removed' });
   };
 
+  // Client Requirements
+  const getClientRequirements = async (clientId: string): Promise<ClientDeviceRequirement[]> => {
+    if (clientRequirements[clientId] && clientRequirements[clientId].length > 0) {
+      return clientRequirements[clientId];
+    }
+    const reqs = await crmService.getClientRequirements(clientId);
+    setClientRequirements(prev => ({ ...prev, [clientId]: reqs }));
+    return reqs;
+  };
+
+  const saveClientRequirements = async (
+    clientId: string,
+    requirements: ClientDeviceRequirement[]
+  ): Promise<ClientDeviceRequirement[]> => {
+    const updated = await crmService.saveClientRequirements(clientId, requirements);
+    setClientRequirements(prev => ({ ...prev, [clientId]: updated }));
+    return updated;
+  };
+
+  const updateClientRequirement = async (clientId: string, deviceKey: string, required: number) => {
+    const updated = await crmService.updateClientRequirement(clientId, deviceKey, required);
+    setClientRequirements(prev => ({ ...prev, [clientId]: updated }));
+  };
+
+  // Device Stock Inventory Actions
+  const refreshDeviceStock = useCallback(async () => {
+    try {
+      const stock = await crmService.getDeviceStock();
+      setDeviceStock(stock);
+    } catch (err) {
+      console.error('Failed to refresh device stock:', err);
+    }
+  }, []);
+
+  const recordStockAction = async (
+    deviceKey: string,
+    action: StockActionType,
+    quantity: number
+  ): Promise<DeviceStockItem> => {
+    const { updatedItem, allStock } = await crmService.recordStockAction(deviceKey, action, quantity);
+    setDeviceStock(allStock);
+    // If India Production changed, update client requirements map in state
+    if (action === 'production_ready' || action === 'shipped_to_us') {
+      const updatedReqMap = await crmService.getClientRequirementsMap();
+      setClientRequirements(updatedReqMap);
+    }
+    crmService.getActivities().then(setActivities).catch(() => {});
+    return updatedItem;
+  };
+
   // Global Search
   const globalSearch = useCallback((query: string) => {
     const q = query.toLowerCase().trim();
@@ -518,6 +613,13 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createDeviceInventoryItem,
         updateDeviceInventoryItem,
         deleteDeviceInventoryItem,
+        clientRequirements,
+        getClientRequirements,
+        saveClientRequirements,
+        updateClientRequirement,
+        deviceStock,
+        recordStockAction,
+        refreshDeviceStock,
         toasts,
         addToast,
         removeToast,

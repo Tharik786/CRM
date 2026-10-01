@@ -41,7 +41,7 @@ export const AppLayout: React.FC = () => {
         />
 
         {/* Page Content Viewport */}
-        <main className="flex-1 px-4 pt-3.5 pb-8 sm:px-6 sm:pt-4 sm:pb-8 md:px-8 md:pt-4 md:pb-8 w-full max-w-[1600px] mx-auto">
+        <main className="flex-1 px-3 sm:px-4 md:px-6 pt-2 pb-6 w-full">
           <Outlet />
         </main>
       </div>

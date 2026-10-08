@@ -101,7 +101,7 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
     } else {
       const defaultLead = initialLead || (initialLeadId ? leads.find(l => l.id === initialLeadId) : null);
       setSelectedLeadId(defaultLead ? defaultLead.id : '');
-      setTitle(defaultLead ? `ZANI Intelligence Platform - ${defaultLead.company}` : 'ZANI Facility Intelligence Platform Quotation');
+      setTitle('ZANI Intelligence Platform');
       setCompanyName(defaultLead ? defaultLead.company : '');
       setContactName(defaultLead ? defaultLead.name : '');
       setContactEmail(defaultLead ? defaultLead.email : '');
@@ -195,7 +195,7 @@ export const QuotationModalForm: React.FC<QuotationModalFormProps> = ({
       if (lead.country) setCountry(lead.country);
       if (lead.location) setLocation(lead.location);
       if (!title || title.startsWith('Commercial Quotation') || title.startsWith('ZANI')) {
-        setTitle(`ZANI Intelligence Platform - ${lead.company}`);
+        setTitle('ZANI Intelligence Platform');
       }
     }
   };

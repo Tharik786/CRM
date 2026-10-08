@@ -1,0 +1,581 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { useCrm } from '../../context/CrmContext';
+import { useAuth } from '../../context/AuthContext';
+import { Card, CardHeader, CardBody } from '../../components/common/Card';
+import { Badge } from '../../components/common/Badge';
+import { LoadingSpinner } from '../../components/common/EmptyState';
+import { formatCurrency, formatRelativeTime } from '../../utils/formatters';
+import {
+  TrendingUp,
+  DollarSign,
+  Award,
+  Target,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock,
+  Activity as ActivityIcon,
+  Flame,
+  PhoneCall,
+  Mail,
+  Users2,
+  CalendarCheck,
+  Cpu,
+  Users,
+  AlertCircle,
+  Truck,
+} from 'lucide-react';
+import { DashboardMetrics } from '../../types/crm';
+import { crmService } from '../../api/services/crmService';
+
+export const DashboardPage: React.FC = () => {
+  const { user } = useAuth();
+  const {
+    tasks = [],
+    toggleTask,
+    installations = [],
+    installerSchedules = [],
+    deviceInventory = [],
+  } = useCrm();
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const overviewMetrics = useMemo(() => {
+    const validInsts = (installations || []).filter(Boolean);
+    const validSchedules = (installerSchedules || []).filter(Boolean);
+    const validDevices = (deviceInventory || []).filter(Boolean);
+
+    // 1. Today's Installations
+    const todayInsts = validInsts.filter(i => (i.installationDate || '') === todayStr);
+    const todayCompleted = todayInsts.filter(i => i.status === 'completed').length;
+    const todayRemaining = Math.max(0, todayInsts.length - todayCompleted);
+
+    // 2. Pending Jobs (installations scheduled or pending)
+    const pendingJobs = validInsts.filter(
+      i => i.status === 'pending' || i.status === 'scheduled'
+    ).length;
+
+    // 3. Available Devices
+    const totalAvailableDevices = validDevices.reduce(
+      (acc, curr) => acc + (curr.availableQty || 0),
+      0
+    );
+    const totalAllocatedDevices = validDevices.reduce(
+      (acc, curr) => acc + (curr.allocatedQty || 0),
+      0
+    );
+
+    // 4. Active Installers
+    const activeInstallerSet = new Set<string>();
+    validInsts.forEach(i => {
+      if (i.status === 'in_progress' || i.status === 'scheduled') {
+        if (i.installer) activeInstallerSet.add(i.installer);
+      }
+    });
+    validSchedules.forEach(s => {
+      if ((s.visitDate || '') === todayStr && s.installer) {
+        activeInstallerSet.add(s.installer);
+      }
+    });
+    const activeInstallersCount = activeInstallerSet.size;
+
+    return {
+      todayCount: todayInsts.length,
+      todayCompleted,
+      todayRemaining,
+      pendingJobs,
+      totalAvailableDevices,
+      totalAllocatedDevices,
+      activeInstallersCount,
+    };
+  }, [installations, installerSchedules, deviceInventory, todayStr]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMetrics = async () => {
+      try {
+        const data = await crmService.getDashboardMetrics();
+        if (isMounted) setMetrics(data);
+      } catch (err) {
+        console.error('Failed to load metrics:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchMetrics();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const fallbackMetrics: DashboardMetrics = {
+    totalRevenue: 0,
+    revenueChange: 0,
+    dealsWonCount: 0,
+    dealsWonChange: 0,
+    activeLeadsCount: 0,
+    leadsChange: 0,
+    winRate: 0,
+    winRateChange: 0,
+    pipelineValue: 0,
+    stageBreakdown: [
+      { stage: 'new', count: 0, totalValue: 0 },
+      { stage: 'proposal', count: 0, totalValue: 0 },
+      { stage: 'negotiation', count: 0, totalValue: 0 },
+      { stage: 'won', count: 0, totalValue: 0 },
+      { stage: 'lost', count: 0, totalValue: 0 },
+      { stage: 'cold', count: 0, totalValue: 0 },
+    ],
+    recentActivities: [],
+    upcomingTasks: [],
+  };
+
+  const activeMetrics = metrics || fallbackMetrics;
+  const todayTasks = (tasks || []).slice(0, 3);
+  const activeDealsCount = (activeMetrics.stageBreakdown || [])
+    .filter(s => s && s.stage !== 'won' && s.stage !== 'lost')
+    .reduce((acc, curr) => acc + (curr?.count || 0), 0);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+      return 'Good morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good afternoon';
+    } else {
+      return 'Good evening';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <LoadingSpinner label="Calculating real-time CRM metrics..." />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3.5 animate-fade-in pb-6">
+      {/* Welcome Greeting Header */}
+      <div>
+        <span className="text-xs sm:text-sm font-medium text-slate-500 tracking-normal block">
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-0.5">
+          {getGreeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
+        </h1>
+      </div>
+
+      {/* KPI Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Total Won Revenue */}
+        <Card className="hover:border-brand-200">
+          <CardBody className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Revenue
+              </span>
+              <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                {formatCurrency(activeMetrics.totalRevenue)}
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs">
+                <span className="inline-flex items-center text-emerald-600 font-semibold">
+                  <ArrowUpRight className="w-3.5 h-3.5" /> {activeMetrics.dealsWonCount} deals won
+                </span>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Pipeline Value */}
+        <Card className="hover:border-brand-200">
+          <CardBody className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Pipeline Value
+              </span>
+              <div className="h-9 w-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                {formatCurrency(activeMetrics.pipelineValue)}
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs">
+                <span className="inline-flex items-center text-brand-600 font-semibold">
+                  <Flame className="w-3.5 h-3.5 text-amber-500 mr-0.5" /> {activeDealsCount} {activeDealsCount === 1 ? 'deal' : 'deals'}
+                </span>
+                <span className="text-slate-400">in progression</span>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Win Rate */}
+        <Card className="hover:border-brand-200">
+          <CardBody className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Win Rate
+              </span>
+              <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Award className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                {activeMetrics.winRate}%
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs">
+                <span className="inline-flex items-center text-emerald-600 font-semibold">
+                  <ArrowUpRight className="w-3.5 h-3.5" /> +{activeMetrics.winRateChange}%
+                </span>
+                <span className="text-slate-400">conversion benchmark</span>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* New Enquiries */}
+        <Card className="hover:border-brand-200">
+          <CardBody className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                New Enquiries
+              </span>
+              <div className="h-9 w-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Target className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                {activeMetrics.activeLeadsCount} Enquiries
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs">
+                <span className="inline-flex items-center text-emerald-600 font-semibold">
+                  +{activeMetrics.leadsChange}%
+                </span>
+                <span className="text-slate-400">inbound growth</span>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Today's Tasks & Follow-ups vs Recent Activities */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Today's Tasks / Reminders */}
+        <Card className="flex flex-col h-[280px]">
+          <CardHeader
+            className="shrink-0"
+            title="Today's Priority Follow-ups"
+            subtitle="Scheduled customer calls, quote reviews, and action items"
+          />
+          <CardBody className="p-0 flex-1 min-h-0 overflow-y-auto">
+            <div className="divide-y divide-slate-100">
+              {todayTasks.map(task => {
+                const isCompleted = task.status === 'completed';
+                const priorityVariants: Record<string, 'rose' | 'amber' | 'green'> = {
+                  urgent: 'rose',
+                  high: 'amber',
+                  medium: 'green',
+                  low: 'green',
+                };
+
+                return (
+                  <div
+                    key={task.id}
+                    className={`p-4 flex items-start gap-3 transition-colors ${
+                      isCompleted ? 'bg-slate-50/60 opacity-60' : 'hover:bg-slate-50/80'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleTask(task.id)}
+                      className={`mt-0.5 rounded-lg p-1 transition-colors ${
+                        isCompleted
+                          ? 'text-emerald-600 bg-emerald-50'
+                          : 'text-slate-400 hover:text-brand-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <CheckCircle2 className={`w-5 h-5 ${isCompleted ? 'fill-emerald-100' : ''}`} />
+                    </button>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4
+                          className={`text-xs font-bold text-slate-800 truncate ${
+                            isCompleted ? 'line-through text-slate-400' : ''
+                          }`}
+                        >
+                          {task.title}
+                        </h4>
+                        <Badge variant={priorityVariants[task.priority]} size="sm">
+                          {task.priority}
+                        </Badge>
+                      </div>
+
+                      {task.description && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-1">{task.description}</p>
+                      )}
+
+                      <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-400">
+                        <span className="flex items-center gap-1 font-medium text-slate-600">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          {task.dueTime || 'All Day'}
+                        </span>
+                        {task.relatedToName && (
+                          <span className="truncate text-slate-500">
+                            • {task.relatedToName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {todayTasks.length === 0 && (
+                <div className="h-36 flex items-center justify-center p-6 text-center text-xs text-slate-400">
+                  No pending follow-ups scheduled for today!
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Recent Activity Timeline */}
+        <Card className="flex flex-col h-[280px]">
+          <CardHeader
+            className="shrink-0"
+            title="Activity Timeline"
+            subtitle="Recent calls, quotations, closed sales, and notes"
+          />
+          <CardBody className="p-0 flex-1 min-h-0 overflow-y-auto">
+            <div className="divide-y divide-slate-100">
+              {(activeMetrics.recentActivities || []).map(act => {
+                const iconMap: Record<string, React.ReactNode> = {
+                  call: <PhoneCall className="w-3.5 h-3.5 text-blue-600" />,
+                  meeting: <Users2 className="w-3.5 h-3.5 text-indigo-600" />,
+                  email: <Mail className="w-3.5 h-3.5 text-amber-600" />,
+                  deal_stage_changed: <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />,
+                  quotation_created: <DollarSign className="w-3.5 h-3.5 text-purple-600" />,
+                  note: <ActivityIcon className="w-3.5 h-3.5 text-slate-600" />,
+                };
+
+                return (
+                  <div key={act.id} className="p-4 flex items-start gap-3 hover:bg-slate-50/50 transition-colors">
+                    <div className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+                      {iconMap[act.type] || <ActivityIcon className="w-3.5 h-3.5 text-slate-600" />}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-800 truncate">{act.title}</h4>
+                        <span className="text-[10px] text-slate-400 shrink-0 font-medium">
+                          {formatRelativeTime(act.timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{act.description}</p>
+                      <div className="mt-2 text-[10px] text-slate-400 flex items-center gap-2">
+                        <span className="font-semibold text-slate-600">{act.performedBy}</span>
+                        {act.relatedToName && <span>• {act.relatedToName}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {(activeMetrics.recentActivities || []).length === 0 && (
+                <div className="h-36 flex items-center justify-center p-6 text-center text-xs text-slate-400">
+                  No recent activities recorded yet.
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Pipeline Summary Breakdown */}
+      <Card>
+        <CardHeader
+          title="Sales Pipeline Summary"
+        />
+        <CardBody>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {(activeMetrics.stageBreakdown || []).map((item, idx) => {
+              const stageLabels: Record<string, string> = {
+                new: 'New',
+                proposal: 'Proposal',
+                negotiation: 'Negotiation',
+                won: 'Won',
+                lost: 'Lost',
+                cold: 'Cold',
+              };
+
+              const colors = [
+                'border-blue-200 bg-blue-50/50 text-blue-700',
+                'border-amber-200 bg-amber-50/50 text-amber-700',
+                'border-purple-200 bg-purple-50/50 text-purple-700',
+                'border-emerald-200 bg-emerald-50/50 text-emerald-700',
+                'border-rose-200 bg-rose-50/50 text-rose-700',
+                'border-slate-300 bg-slate-100 text-slate-700',
+              ];
+
+              return (
+                <div
+                  key={item.stage}
+                  className={`p-3.5 rounded-xl border ${colors[idx % colors.length]} flex flex-col justify-between`}
+                >
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider block opacity-80">
+                      {stageLabels[item.stage]}
+                    </span>
+                    <div className="text-lg font-black font-mono mt-1">
+                      {formatCurrency(item.totalValue)}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs font-medium opacity-75">
+                    {item.count} {item.count === 1 ? 'deal' : 'deals'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Operations Overview Section */}
+      <div className="space-y-4 pt-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              Operations Overview
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Live snapshot of field installations, dispatch queues, and hardware inventory
+            </p>
+          </div>
+          <Link
+            to="/operations"
+            className="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline flex items-center gap-1"
+          >
+            Manage Operations &rarr;
+          </Link>
+        </div>
+
+        {/* Overview Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {/* Today's Installations */}
+          <Card className="hover:border-brand-200 transition-all">
+            <CardBody className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Today's Installations
+                </span>
+                <div className="h-9 w-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <CalendarCheck className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {overviewMetrics.todayCount}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="text-emerald-600 font-semibold inline-flex items-center gap-0.5">
+                    <CheckCircle2 className="w-3 h-3" /> {overviewMetrics.todayCompleted} done
+                  </span>
+                  <span>•</span>
+                  <span className="text-slate-500 font-medium">
+                    {overviewMetrics.todayRemaining} remaining
+                  </span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Pending Jobs */}
+          <Card className="hover:border-brand-200 transition-all">
+            <CardBody className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Pending Jobs
+                </span>
+                <div className="h-9 w-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Clock className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {overviewMetrics.pendingJobs}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs">
+                  <span className="inline-flex items-center text-amber-600 font-medium">
+                    <AlertCircle className="w-3 h-3 mr-1" /> Awaiting dispatch & site prep
+                  </span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Available Devices */}
+          <Card className="hover:border-brand-200 transition-all">
+            <CardBody className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Available Devices
+                </span>
+                <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Cpu className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {overviewMetrics.totalAvailableDevices}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="text-brand-600 font-semibold">
+                    {overviewMetrics.totalAllocatedDevices} allocated
+                  </span>
+                  <span>in field deployments</span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Active Installers */}
+          <Card className="hover:border-brand-200 transition-all">
+            <CardBody className="p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Active Installers
+                </span>
+                <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Users className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {overviewMetrics.activeInstallersCount}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="text-indigo-600 font-semibold inline-flex items-center gap-1">
+                    <Truck className="w-3 h-3" /> Field crew on duty
+                  </span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+};
